@@ -1,0 +1,873 @@
+<!-- blog content -->
+<div id="gsi-blog-title">
+    <h1>证券交易系统撮合引擎的设计</h1>
+</div>
+<div id="gsi-blog-info" class="my-2">
+    <svg xmlns="http://www.w3.org/2000/svg" class="gsc-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+        stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round"
+            d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5m-9-6h.008v.008H12v-.008ZM12 15h.008v.008H12V15Zm0 2.25h.008v.008H12v-.008ZM9.75 15h.008v.008H9.75V15Zm0 2.25h.008v.008H9.75v-.008ZM7.5 15h.008v.008H7.5V15Zm0 2.25h.008v.008H7.5v-.008Zm6.75-4.5h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V15Zm0 2.25h.008v.008h-.008v-.008Zm2.25-4.5h.008v.008H16.5v-.008Zm0 2.25h.008v.008H16.5V15Z" />
+    </svg>
+
+    <time datetime="2021-12-10"></time>
+</div>
+<div id="gsi-blog-content">
+    <p>../../books/git/BEFORE.md</p>
+<p>在证券交易系统中，撮合引擎是实现买卖盘成交的关键组件。本文我们将分析撮合引擎的工作原理，并以最简化的Java代码设计并实现一个撮合引擎。</p>
+<p>在证券市场中，撮合交易是一种微观价格发现模型，它允许买卖双方各自提交买卖订单并报价，按价格优先，时间优先的顺序，凡买单价格大于等于卖单价格时，双方即达成价格协商并成交。在A股身经百战的老股民对此规则应该非常熟悉，这里不再详述。</p>
+<p>我们将讨论如何从技术上来实现它。对于撮合引擎来说，它必须维护两个买卖盘列表，一个买盘，一个卖盘，买盘按价格从高到低排序，确保报价最高的订单排在最前面；卖盘则相反，按照价格从低到高排序，确保报价最低的卖单排在最前面。</p>
+<p>下图是一个实际的买卖盘：</p>
+<p><img src="orderbook.jpg" alt="order-book" loading="lazy"></p>
+<p>对于买盘来说，上图的订单排序为2086.50，2086.09，2086.06，20860，2085.97，……</p>
+<p>对于卖盘来说，上图的订单排序为2086.55，2086.75，2086.77，2086.90，2086.99，……</p>
+<p>不可能出现买1价格大于等于卖1价格的情况，因为这意味着应该成交的买卖订单没有成交却在订单簿上等待成交。</p>
+<p>对于多个价格相同的订单，例如2086.55，很可能张三卖出1，李四卖出3，累计数量是4。当一个新的买单价格≥2086.55时，到底优先和张三的卖单成交还是优先和李四的卖单成交呢？这要看张三和李四的订单时间谁更靠前。</p>
+<p>有了以上规则，我们先设计一个最简单的订单类<code>Order</code>：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-keyword">public</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">Order</span> {
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">final</span> <span class="hljs-type">long</span> sequenceId; <span class="hljs-comment">// 序号</span>
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">final</span> Direction direction; <span class="hljs-comment">// 订单方向</span>
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">final</span> BigDecimal price; <span class="hljs-comment">// 价格</span>
+    <span class="hljs-keyword">public</span> BigDecimal amount; <span class="hljs-comment">// 数量</span>
+
+    <span class="hljs-comment">// 构造方法略:</span>
+    <span class="hljs-keyword">public</span> <span class="hljs-title function_">Order</span><span class="hljs-params">(<span class="hljs-type">long</span> sequenceId, Direction direction, BigDecimal price, BigDecimal amount)</span> {
+        ...
+    }
+}
+</code></pre>
+<p>虽然订单的成交规则遵循价格优先、时间优先的原则，但我们并不会比较两个订单的下单时间，而是给接收到的所有订单依次赋予一个递增的序列号，序列号越小的自然时间越早，因此排在前面。时间本身实际上是订单的一个普通属性，不参与业务排序。</p>
+<p>订单方向用枚举<code>Direction</code>实现，它仅有<code>BUY</code>和<code>SELL</code>两个值：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-keyword">public</span> <span class="hljs-keyword">enum</span> <span class="hljs-title class_">Direction</span> {
+    BUY, SELL;
+}
+</code></pre>
+<p>价格和数量以<code>BigDecimal</code>表示。不用<code>float</code>或<code>double</code>的原因在于计算机无法进行精确的浮点数运算，而金融交易的价格、数量是不允许有误差的，因此，必须用<code>BigDecimal</code>作为定点数运算。</p>
+<p>下一步是实现订单簿<code>OrderBook</code>的表示。一个直观的想法是使用<code>List&lt;Order&gt;</code>，并对订单进行排序。但是，在证券交易中，使用<code>List</code>会导致两个致命问题：</p>
+<ol>
+<li>插入新的订单时，必须从头扫描<code>List&lt;Order&gt;</code>，以便在合适的地方插入<code>Order</code>，平均耗时O(N)；</li>
+<li>取消订单时，也必须从头扫描<code>List&lt;Order&gt;</code>，平均耗时O(N)。</li>
+</ol>
+<p>更好的方法是使用红黑树，它是一种自平衡的二叉排序树，插入和删除的效率都是O(logN)，对应的Java类是<code>TreeMap</code>。</p>
+<p>所以我们定义<code>OrderBook</code>的结构就是一个<code>TreeMap&lt;OrderKey, Order&gt;</code>，它的排序根据<code>OrderKey</code>决定。由业务规则可知，负责排序的<code>OrderKey</code>只需要<code>sequenceId</code>和<code>price</code>即可：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-keyword">public</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">OrderKey</span> {
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">final</span> <span class="hljs-type">long</span> sequenceId;
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">final</span> BigDecimal price;
+
+    <span class="hljs-comment">// 构造方法略</span>
+}
+</code></pre>
+<p>因此，<code>OrderBook</code>的核心数据结构就可以表示如下：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-keyword">public</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">OrderBook</span> {
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">final</span> Direction direction; <span class="hljs-comment">// 方向</span>
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">final</span> TreeMap&lt;OrderKey, Order&gt; book; <span class="hljs-comment">// 排序树</span>
+
+    <span class="hljs-keyword">public</span> <span class="hljs-title function_">OrderBook</span><span class="hljs-params">(Direction direction)</span> {
+        <span class="hljs-built_in">this</span>.direction = direction;
+        <span class="hljs-built_in">this</span>.book = <span class="hljs-keyword">new</span> <span class="hljs-title class_">TreeMap</span>&lt;&gt;(???);
+    }
+}
+</code></pre>
+<p>有的童鞋注意到<code>TreeMap</code>的排序要求实现<code>Comparable</code>接口或者提供一个<code>Comparator</code>。我们之所以没有在<code>OrderKey</code>上实现<code>Comparable</code>接口是因为买卖盘排序的价格规则不同，因此，编写两个<code>Comparator</code>分别用于排序买盘和卖盘：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-keyword">private</span> <span class="hljs-keyword">static</span> <span class="hljs-keyword">final</span> Comparator&lt;OrderKey&gt; SORT_SELL = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Comparator</span>&lt;&gt;() {
+    <span class="hljs-keyword">public</span> <span class="hljs-type">int</span> <span class="hljs-title function_">compare</span><span class="hljs-params">(OrderKey o1, OrderKey o2)</span> {
+        <span class="hljs-comment">// 价格低在前:</span>
+        <span class="hljs-type">int</span> <span class="hljs-variable">cmp</span> <span class="hljs-operator">=</span> o1.price.compareTo(o2.price);
+        <span class="hljs-comment">// 时间早在前:</span>
+        <span class="hljs-keyword">return</span> cmp == <span class="hljs-number">0</span> ? Long.compare(o1.sequenceId, o2.sequenceId) : cmp;
+    }
+};
+
+<span class="hljs-keyword">private</span> <span class="hljs-keyword">static</span> <span class="hljs-keyword">final</span> Comparator&lt;OrderKey&gt; SORT_BUY = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Comparator</span>&lt;&gt;() {
+    <span class="hljs-keyword">public</span> <span class="hljs-type">int</span> <span class="hljs-title function_">compare</span><span class="hljs-params">(OrderKey o1, OrderKey o2)</span> {
+        <span class="hljs-comment">// 价格高在前:</span>
+        <span class="hljs-type">int</span> <span class="hljs-variable">cmp</span> <span class="hljs-operator">=</span> o2.price.compareTo(o1.price);
+        <span class="hljs-comment">// 时间早在前:</span>
+        <span class="hljs-keyword">return</span> cmp == <span class="hljs-number">0</span> ? Long.compare(o1.sequenceId, o2.sequenceId) : cmp;
+    }
+};
+</code></pre>
+<p>这样，<code>OrderBook</code>的<code>TreeMap</code>排序就由<code>Direction</code>指定：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-keyword">public</span> <span class="hljs-title function_">OrderBook</span><span class="hljs-params">(Direction direction)</span> {
+    <span class="hljs-built_in">this</span>.direction = direction;
+    <span class="hljs-built_in">this</span>.book = <span class="hljs-keyword">new</span> <span class="hljs-title class_">TreeMap</span>&lt;&gt;(direction == Direction.BUY ? SORT_BUY : SORT_SELL);
+}
+</code></pre>
+<p>这里友情提示Java的<code>BigDecimal</code>比较大小的大坑：比较两个<code>BigDecimal</code>是否值相等，一定要用<code>compareTo()</code>，不要用<code>equals()</code>，因为<code>1.2</code>和<code>1.20</code>因为<code>scale</code>不同导致<code>equals()</code>返回<code>false</code>。</p>
+<div class="alert alert-warning">
+<p><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg> 特别注意<span></span></p>
+<p>在Java中比较两个<code>BigDecimal</code>的值只能使用<code>compareTo()</code>，不能使用<code>equals()</code>！
+</p></div>
+<p>再给<code>OrderBook</code>添加插入、删除和查找首元素方法：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-keyword">public</span> Order <span class="hljs-title function_">getFirst</span><span class="hljs-params">()</span> {
+    <span class="hljs-keyword">return</span> <span class="hljs-built_in">this</span>.book.isEmpty() ? <span class="hljs-literal">null</span> : <span class="hljs-built_in">this</span>.book.firstEntry().getValue();
+}
+
+<span class="hljs-keyword">public</span> <span class="hljs-type">boolean</span> <span class="hljs-title function_">remove</span><span class="hljs-params">(Order order)</span> {
+    <span class="hljs-keyword">return</span> <span class="hljs-built_in">this</span>.book.remove(<span class="hljs-keyword">new</span> <span class="hljs-title class_">OrderKey</span>(order.sequenceId, order.price)) != <span class="hljs-literal">null</span>;
+}
+
+<span class="hljs-keyword">public</span> <span class="hljs-type">boolean</span> <span class="hljs-title function_">add</span><span class="hljs-params">(Order order)</span> {
+    <span class="hljs-keyword">return</span> <span class="hljs-built_in">this</span>.book.put(<span class="hljs-keyword">new</span> <span class="hljs-title class_">OrderKey</span>(order.sequenceId, order.price), order) == <span class="hljs-literal">null</span>;
+}
+</code></pre>
+<p>现在，有了买卖盘，我们就可以编写撮合引擎了。定义<code>MatchEngine</code>核心数据结构如下：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-keyword">public</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">MatchEngine</span> {
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">final</span> <span class="hljs-type">OrderBook</span> <span class="hljs-variable">buyBook</span> <span class="hljs-operator">=</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">OrderBook</span>(Direction.BUY);
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">final</span> <span class="hljs-type">OrderBook</span> <span class="hljs-variable">sellBook</span> <span class="hljs-operator">=</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">OrderBook</span>(Direction.SELL);
+    <span class="hljs-keyword">public</span> <span class="hljs-type">BigDecimal</span> <span class="hljs-variable">marketPrice</span> <span class="hljs-operator">=</span> BigDecimal.ZERO; <span class="hljs-comment">// 最新市场价</span>
+}
+</code></pre>
+<p>一个完整的撮合引擎包含一个买盘、一个卖盘和一个最新成交价（初始值为0）。撮合引擎的输入是一个<code>Order</code>实例，每处理一个<code>Order</code>，就输出撮合结果<code>MatchResult</code>，核心处理方法定义如下：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-keyword">public</span> MatchResult <span class="hljs-title function_">processOrder</span><span class="hljs-params">(Order order)</span> {
+    ...
+}
+</code></pre>
+<p>下面我们讨论如何处理一个具体的<code>Order</code>。对于撮合交易来说，如果新订单是一个买单，则首先尝试在卖盘中匹配价格合适的卖单，如果匹配成功则成交。一个大的买单可能会匹配多个较小的卖单。当买单被完全匹配后，说明此买单已完全成交，处理结束，否则，如果存在未成交的买单，则将其放入买盘。处理卖单的逻辑是类似的。</p>
+<p>我们把已经挂在买卖盘的订单称为挂单（Maker），当前正在处理的订单称为吃单（Taker），一个Taker订单如果未完全成交则转为Maker挂在买卖盘，因此，处理当前Taker订单的逻辑如下：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-keyword">public</span> MatchResult <span class="hljs-title function_">processOrder</span><span class="hljs-params">(Order order)</span> {
+    <span class="hljs-keyword">switch</span> (order.direction) {
+    <span class="hljs-keyword">case</span> BUY:
+        <span class="hljs-comment">// 买单与sellBook匹配，最后放入buyBook:</span>
+        <span class="hljs-keyword">return</span> processOrder(order, <span class="hljs-built_in">this</span>.sellBook, <span class="hljs-built_in">this</span>.buyBook);
+    <span class="hljs-keyword">case</span> SELL:
+        <span class="hljs-comment">// 卖单与buyBook匹配，最后放入sellBook:</span>
+        <span class="hljs-keyword">return</span> processOrder(order, <span class="hljs-built_in">this</span>.buyBook, <span class="hljs-built_in">this</span>.sellBook);
+    <span class="hljs-keyword">default</span>:
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">IllegalArgumentException</span>(<span class="hljs-string">&quot;Invalid direction.&quot;</span>);
+    }
+}
+
+<span class="hljs-comment">/**
+ * <span class="hljs-doctag">@param</span> takerOrder  输入订单
+ * <span class="hljs-doctag">@param</span> makerBook   尝试匹配成交的OrderBook
+ * <span class="hljs-doctag">@param</span> anotherBook 未能完全成交后挂单的OrderBook
+ * <span class="hljs-doctag">@return</span> 成交结果
+ */</span>
+MatchResult <span class="hljs-title function_">processOrder</span><span class="hljs-params">(Order takerOrder, OrderBook makerBook, OrderBook anotherBook)</span> {
+    ...
+}
+</code></pre>
+<p>根据价格匹配，直到成交双方有一方完全成交或成交条件不满足时结束处理，我们直接给出<code>processOrder()</code>的业务逻辑代码：</p>
+<pre class="hljs"><code class="language-java">MatchResult <span class="hljs-title function_">processOrder</span><span class="hljs-params">(Order takerOrder, OrderBook makerBook, OrderBook anotherBook)</span> {
+    <span class="hljs-type">MatchResult</span> <span class="hljs-variable">matchResult</span> <span class="hljs-operator">=</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">MatchResult</span>(takerOrder);
+    <span class="hljs-keyword">for</span> (;;) {
+        <span class="hljs-type">Order</span> <span class="hljs-variable">makerOrder</span> <span class="hljs-operator">=</span> makerBook.getFirst();
+        <span class="hljs-keyword">if</span> (makerOrder == <span class="hljs-literal">null</span>) {
+            <span class="hljs-comment">// 对手盘不存在:</span>
+            <span class="hljs-keyword">break</span>;
+        }
+        <span class="hljs-keyword">if</span> (takerOrder.direction == Direction.BUY &amp;&amp; takerOrder.price.compareTo(makerOrder.price) &lt; <span class="hljs-number">0</span>) {
+            <span class="hljs-comment">// 买入订单价格比卖盘第一档价格低:</span>
+            <span class="hljs-keyword">break</span>;
+        } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (takerOrder.direction == Direction.SELL &amp;&amp; takerOrder.price.compareTo(makerOrder.price) &gt; <span class="hljs-number">0</span>) {
+            <span class="hljs-comment">// 卖出订单价格比卖盘第一档价格高:</span>
+            <span class="hljs-keyword">break</span>;
+        }
+        <span class="hljs-comment">// 以Maker价格成交:</span>
+        <span class="hljs-built_in">this</span>.marketPrice = makerOrder.price;
+        <span class="hljs-comment">// 成交数量为两者较小值:</span>
+        <span class="hljs-type">BigDecimal</span> <span class="hljs-variable">matchedAmount</span> <span class="hljs-operator">=</span> takerOrder.amount.min(makerOrder.amount);
+        <span class="hljs-comment">// 成交记录:</span>
+        matchResult.add(makerOrder.price, matchedAmount, makerOrder);
+        <span class="hljs-comment">// 更新成交后的订单数量:</span>
+        takerOrder.amount = takerOrder.amount.subtract(matchedAmount);
+        makerOrder.amount = makerOrder.amount.subtract(matchedAmount);
+        <span class="hljs-comment">// 对手盘完全成交后，从订单簿中删除:</span>
+        <span class="hljs-keyword">if</span> (makerOrder.amount.signum() == <span class="hljs-number">0</span>) {
+            makerBook.remove(makerOrder);
+        }
+        <span class="hljs-comment">// Taker订单完全成交后，退出循环:</span>
+        <span class="hljs-keyword">if</span> (takerOrder.amount.signum() == <span class="hljs-number">0</span>) {
+            <span class="hljs-keyword">break</span>;
+        }
+    }
+    <span class="hljs-comment">// Taker订单未完全成交时，放入订单簿:</span>
+    <span class="hljs-keyword">if</span> (takerOrder.amount.signum() &gt; <span class="hljs-number">0</span>) {
+        anotherBook.add(takerOrder);
+    }
+    <span class="hljs-keyword">return</span> matchResult;
+}
+</code></pre>
+<p>可见，撮合匹配的业务逻辑是相对简单的。撮合结果记录在<code>MatchResult</code>中，它可以用一个Taker订单和一系列撮合匹配记录表示：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-keyword">public</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">MatchResult</span> {
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">final</span> Order takerOrder;
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">final</span> List&lt;MatchRecord&gt; matchRecords = <span class="hljs-keyword">new</span> <span class="hljs-title class_">ArrayList</span>&lt;&gt;();
+
+    <span class="hljs-comment">// 构造方法略</span>
+}
+</code></pre>
+<p>撮合记录则由成交双方、成交价格与数量表示：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-keyword">public</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">MatchRecord</span> {
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">final</span> BigDecimal price;
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">final</span> BigDecimal amount;
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">final</span> Order takerOrder;
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">final</span> Order makerOrder;
+
+    <span class="hljs-comment">// 构造方法略</span>
+}
+</code></pre>
+<p>撮合引擎返回的<code>MatchResult</code>包含了本次处理的完整结果，下一步需要把<code>MatchResult</code>发送给清算系统，对交易双方进行清算即完成了整个交易的处理。</p>
+<p>我们可以编写一个简单的测试来验证撮合引擎工作是否正常。假设如下的订单依次输入到撮合引擎：</p>
+<pre class="hljs"><code class="language-plain">// 方向 价格 数量
+buy  2082.34 1
+sell 2087.6  2
+buy  2087.8  1
+buy  2085.01 5
+sell 2088.02 3
+sell 2087.60 6
+buy  2081.11 7
+buy  2086.0  3
+buy  2088.33 1
+sell 2086.54 2
+sell 2086.55 5
+buy  2086.55 3
+</code></pre>
+<p>经过撮合后最终买卖盘及市场价如下：</p>
+<pre class="ascii"><code>2088.02 3
+2087.60 6
+2086.55 4
+---------
+2086.55
+---------
+2086.00 3
+2085.01 5
+2082.34 1
+2081.11 7
+</code></pre>
+<p>如果我们仔细观察整个系统的输入和输出，输入实际上是一系列按时间排序后的订单（实际排序按sequenceId），输出是一系列<code>MatchResult</code>，内部状态的变化就是买卖盘以及市场价的变化。如果两个初始状态相同的<code>MatchEngine</code>，输入的订单序列是完全相同的，则我们得到的<code>MatchResult</code>输出序列以及最终的内部状态也是完全相同的，因此，可以轻易地使用两个独立的<code>MatchEngine</code>作为集群，将同一组订单序列分别输入给不同的<code>MatchEngine</code>，取任意一个<code>MatchEngine</code>的输出结果都是正确的。</p>
+<h3>参考源码</h3>
+<p>可以从<a href="https://github.com/michaelliao/simple-match-engine" target="_blank">GitHub</a>下载本文源码。</p>
+<h3>小结</h3>
+<p>本文讨论并实现了一个可工作的撮合引擎核心。实现撮合引擎的关键在于将业务模型转换为高效的数据结构。只要保证核心数据结构的简单和高效，撮合引擎的业务逻辑编写是非常容易的。</p>
+
+</div>
+<script>
+    (() => {
+        let dom = document.querySelector('#gsi-blog-info time');
+        dom.innerHTML = new Date(dom.getAttribute('datetime')).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+    })();
+</script>
+
+
+
+
+
+
+<hr class="gsc-border">
+
+<div id="gsi-blog-prev-next" class="flex flex-row mt-4">
+    <div id="gsi-blog-prev" class="basis-1/2 text-left">
+
+        <a href="/blogs/all/2021-12-21-exchange-account/index.html"
+            onclick="gs_load_blog('/blogs/all/2021-12-21-exchange-account/index.html',true);return false;"
+            class="inline-block my-2">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M18.75 19.5l-7.5-7.5 7.5-7.5m-6 15L5.25 12l7.5-7.5" />
+            </svg>
+            证券交易系统用户资产的设计
+        </a>
+
+    </div>
+    <div id="gsi-blog-next" class="basis-1/2 text-right">
+
+        <a href="/blogs/all/2021-11-29-metaverse-howto/index.html"
+            onclick="gs_load_blog('/blogs/all/2021-11-29-metaverse-howto/index.html',true);return false;"
+            class="inline-block my-2">
+            元宇宙落地指南
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M11.25 4.5l7.5 7.5-7.5 7.5m-6-15l7.5 7.5-7.5 7.5" />
+            </svg>
+        </a>
+
+    </div>
+</div>
+
+
+<!-- oauth comment -->
+
+<hr class="gsc-border mt-4">
+<div class="mb-4"></div>
+<style>
+    div.comment-item {
+        display: flex;
+        max-width: 100%;
+        padding-bottom: 16px;
+    }
+
+    div.comment-item>div.comment-avatar {
+        flex-shrink: 0;
+        padding-right: 16px;
+    }
+
+    div.comment-item>div.comment-avatar>img {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+    }
+
+    div.comment-item>div.comment-content {
+        flex-grow: 1;
+        overflow: auto;
+    }
+</style>
+<script src="/static/markdown-it.min.js"></script>
+<script>
+    if (window.gitsite_comment === undefined) {
+        (function () {
+            const MAX_COMMENT_HEIGHT = 400;
+            // begin function
+            function _comment_set_token(token, user, expires) {
+                localStorage.setItem('_comment_token_', token);
+                localStorage.setItem('_comment_user_', JSON.stringify(user));
+                localStorage.setItem('_comment_expires_', expires.toString());
+            }
+
+            function _comment_get_user() {
+                const expires = parseInt(localStorage.getItem('_comment_expires_') || '0');
+                if (Date.now() > expires) {
+                    return null;
+                }
+                return JSON.parse(localStorage.getItem('_comment_user_'));
+            }
+
+            function _comment_get_token() {
+                const expires = parseInt(localStorage.getItem('_comment_expires_') || '0');
+                if (Date.now() > expires) {
+                    return null;
+                }
+                return localStorage.getItem('_comment_token_');
+            }
+
+            function _comment_markdown_render(text, autoCollapse = true) {
+                const md = markdownit();
+                const defaultRender = md.renderer.rules.link_open || function (tokens, idx, options, env, self) {
+                    return self.renderToken(tokens, idx, options);
+                };
+                md.renderer.rules.link_open = function (tokens, idx, options, env, self) {
+                    // Add a new `target` attribute, or replace the value of the existing one.
+                    tokens[idx].attrSet('target', '_blank');
+                    tokens[idx].attrSet('rel', 'nofollow');
+                    // Pass the token to the default renderer.
+                    return defaultRender(tokens, idx, options, env, self);
+                };
+                if (autoCollapse) {
+                    return '<div class="x-auto-collapse">' + md.render(text) + '</div>';
+                }
+                return md.render(text);
+            }
+
+            function _comment_remove(btn, msg) {
+                if (!confirm(msg)) {
+                    return;
+                }
+                const item = _comment_find_parent(btn, 'comment-item');
+                const type = item.getAttribute('type');
+                const id = item.getAttribute('id');
+                const token = _comment_get_token();
+                let path = null;
+                let data = {};
+                if (type === 'comment') {
+                    path = '/api/comments';
+                    data.commentId = id;
+                } else if (type === 'reply') {
+                    path = '/api/replies';
+                    data.replyId = id;
+                } else {
+                    throw 'invalid type';
+                }
+                btn.style.display = 'none';
+                fetch('https://api.liaoxuefeng.com' + path, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': 'Bearer: ' + token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                }).then(resp => {
+                    console.log('delete ok.');
+                    _comment_start_load(true);
+                }).catch(err => {
+                    console.error(err);
+                });
+            }
+
+            function _comment_post(btn) {
+                const form = _comment_find_parent(btn, 'comment-form');
+                const err = form.querySelector('span.comment-post-error');
+                const token = _comment_get_token();
+                if (!token) {
+                    err.innerHTML = 'Please sign in first.';
+                    return;
+                }
+                const textarea = form.querySelector('textarea');
+                const content = textarea.value.trim();
+                if (content === '') {
+                    err.innerHTML = 'content is empty.';
+                    return;
+                }
+                const type = form.getAttribute('type');
+                const id = form.getAttribute('id');
+                let data = {
+                    content: content
+                };
+                let path = null;
+                if (type === 'comment') {
+                    data.pageUrl = id;
+                    path = '/api/comments';
+                } else if (type === 'reply') {
+                    data.commentId = id;
+                    path = '/api/replies';
+                } else {
+                    err.innerHTML = 'invalid type.';
+                    return;
+                }
+                console.log(data);
+                err.innerHTML = '';
+                btn.disabled = true;
+
+                fetch('https://api.liaoxuefeng.com' + path, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer: ' + token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                }).then(resp => {
+                    resp.json().then(obj => {
+                        if (obj.error) {
+                            console.error(obj.error, obj.message);
+                            err.innerHTML = (obj.message || obj.error).toString();
+                        } else {
+                            console.log('post comment ok.');
+                            textarea.value = '';
+                            _comment_start_load(true);
+                        }
+                    });
+                }).catch(err => {
+                    console.error(err);
+                    err.innerHTML = err.toString();
+                }).finally(() => {
+                    btn.disabled = false;
+                });
+            }
+
+            function _comment_has_class(dom, className) {
+                for (let i = 0; i < dom.classList.length; i++) {
+                    if (dom.classList[i] === className) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            function _comment_find_parent(dom, className) {
+                while (!_comment_has_class(dom, className)) {
+                    dom = dom.parentElement;
+                }
+                return dom;
+            }
+
+            function _comment_start_reply(dom) {
+                const actions = _comment_find_parent(dom, 'comment-action');
+                const item = _comment_find_parent(dom, 'comment-item');
+                const form = item.querySelector('div.comment-form');
+                actions.style.display = 'none';
+                form.style.display = 'block';
+            }
+
+            function _comment_start_write(dom) {
+                const form = _comment_find_parent(dom, 'comment-form');
+                form.querySelector('div.comment-toolbar span.comment-write').style.display = 'inline';
+                form.querySelector('div.comment-toolbar a.comment-write').style.display = 'none';
+                form.querySelector('div.comment-toolbar span.comment-preview').style.display = 'none';
+                form.querySelector('div.comment-toolbar a.comment-preview').style.display = 'inline';
+                form.querySelectorAll('div.comment-toolbar a.comment-button').forEach(a => a.style.display = 'inline');
+                form.querySelector('div.comment-form-edit').style.display = 'block';
+                form.querySelector('div.comment-form-preview').style.display = 'none';
+            }
+
+            function _comment_start_preview(dom) {
+                const form = _comment_find_parent(dom, 'comment-form');
+                form.querySelector('div.comment-toolbar span.comment-write').style.display = 'none';
+                form.querySelector('div.comment-toolbar a.comment-write').style.display = 'inline';
+                form.querySelector('div.comment-toolbar span.comment-preview').style.display = 'inline';
+                form.querySelector('div.comment-toolbar a.comment-preview').style.display = 'none';
+                form.querySelectorAll('div.comment-toolbar a.comment-button').forEach(a => a.style.display = 'none');
+                form.querySelector('div.comment-form-edit').style.display = 'none';
+                const preview = form.querySelector('div.comment-form-preview');
+                const text = form.querySelector('textarea').value.trim() || '(empty)';
+                preview.innerHTML = _comment_markdown_render(text, false);
+                preview.style.display = 'block';
+            }
+
+            function _comment_edit(dom, command) {
+                const form = _comment_find_parent(dom, 'comment-form');
+                let insert = '';
+                switch (command) {
+                    case 'link':
+                        insert = '[link](https://example.com/)'
+                        break;
+                    case 'code':
+                        insert = '\n\n```\npaste code here...\n```\n\n';
+                        break;
+                    case 'ol':
+                        insert = '\n\n- item 1\n- item 2\n- item 3\n\n';
+                        break;
+                    case 'ul':
+                        insert = '\n\n1. item 1\n2. item 2\n3. item 3\n\n';
+                        break;
+                }
+                if (insert) {
+                    const textarea = form.querySelector('textarea');
+                    const position = textarea.selectionStart;
+                    const value = textarea.value;
+                    // Get the text before and after the cursor position
+                    const before = value.substring(0, position);
+                    const after = value.substring(position, value.length);
+
+                    // Insert the new text at the cursor position
+                    textarea.value = before + insert + after;
+
+                    // Set the cursor position to after the newly inserted text
+                    textarea.selectionStart = textarea.selectionEnd = position + insert.length;
+                    textarea.focus();
+                }
+            }
+
+            function _comment_render_template(str, obj) {
+                const keys = Object.keys(obj);
+                for (let key of keys) {
+                    let value = obj[key];
+                    str = str.replaceAll(new RegExp('\\$\\{' + key + '\\}', 'g'), value);
+                }
+                return str;
+            }
+
+            function _comment_loaded(commentThread, result, scroll) {
+                console.log('comments loaded ok.');
+                const itemTempl = document.getElementById('comment-item').innerHTML;
+                const formTempl = document.getElementById('comment-form').innerHTML;
+                const me = _comment_get_user();
+                console.log(result);
+                const action_delete_comment = '<a href="#0" onclick="gitsite_comment.remove(this, \'Confirm delete this comment?\')">Delete</a>';
+                const action_delete_reply = '<a href="#0" onclick="gitsite_comment.remove(this, \'Confirm delete this reply?\')">Delete</a>';
+                let comment_doms = result.comments.map(comment => {
+                    const action_reply = '<div class="comment-action pt-4 border-t gsc-border"><a href="#0" onclick="gitsite_comment.reply(this)">Reply</a></div>';
+                    const can_delete_comment = me !== null && (me.role === 1000 || me.id === comment.user_id);
+                    let model = {
+                        type: 'comment',
+                        id: comment.id,
+                        user_image: comment.user_image,
+                        user_name: gitsite.encodeHtml(comment.user_name),
+                        created_at: new Date(comment.created_at).toLocaleString(),
+                        content: _comment_markdown_render(comment.content),
+                        comment_reply_form: '',
+                        comment_action: me === null ? '' : action_reply,
+                        delete_action: can_delete_comment ? action_delete_comment : ''
+                    }
+                    let reply_doms = comment.replies.map(reply => {
+                        const can_delete_reply = me !== null && (me.role === 1000 || me.id === reply.user_id);
+                        let replyModel = {
+                            type: 'reply',
+                            id: reply.id,
+                            user_image: reply.user_image,
+                            user_name: gitsite.encodeHtml(reply.user_name),
+                            created_at: new Date(reply.created_at).toLocaleString(),
+                            content: _comment_markdown_render(reply.content),
+                            comment_reply_form: '',
+                            comment_replies: '',
+                            comment_action: '',
+                            delete_action: can_delete_reply ? action_delete_reply : ''
+                        };
+                        return _comment_render_template(itemTempl, replyModel);
+                    });
+                    model.comment_replies = reply_doms.join('');
+                    // set comment_reply_form:
+                    if (me !== null) {
+                        model.comment_reply_form = _comment_render_template(formTempl, {
+                            type: 'reply',
+                            id: comment.id,
+                            style: 'display:none',
+                            user_name: me.name,
+                            user_image: me.image
+                        });
+                    }
+                    return _comment_render_template(itemTempl, model);
+                });
+                let html = comment_doms.join('');
+                if (me !== null) {
+                    let comment_form = _comment_render_template(formTempl, {
+                        type: 'comment',
+                        id: location.href,
+                        style: '',
+                        user_name: me.name,
+                        user_image: me.image
+                    });
+                    html = html + comment_form;
+                }
+                commentThread.querySelector('div.comment-loading').style.display = 'none';
+                commentThread.querySelector('div.comment-topics').innerHTML = html;
+                commentThread.querySelectorAll('div.comment-topics div.x-auto-collapse').forEach(div => {
+                    if (div.scrollHeight <= MAX_COMMENT_HEIGHT + 60) {
+                        return;
+                    }
+                    div.style.maxHeight = MAX_COMMENT_HEIGHT + 'px';
+                    div.style.overflow = 'hidden';
+                    let p = document.createElement('p');
+                    p.innerHTML = '<a href="#0" class="x-read-more">Read More ▼</a><a href="#0" class="x-collapse" style="display:none">Collapse ▲</a>';
+                    div.parentNode.appendChild(p);
+                    const aReadMore = p.querySelector('a.x-read-more');
+                    const aCollapse = p.querySelector('a.x-collapse');
+                    aReadMore.onclick = () => {
+                        div.style.maxHeight = null;
+                        div.style.overflow = null;
+                        aReadMore.style.display = 'none';
+                        aCollapse.style.display = null;
+                    };
+                    aCollapse.onclick = () => {
+                        div.style.maxHeight = MAX_COMMENT_HEIGHT + 'px';
+                        div.style.overflow = 'hidden';
+                        aReadMore.style.display = null;
+                        aCollapse.style.display = 'none';
+                        div.parentNode.parentNode.scrollIntoView();
+                    };
+                });
+                if (scroll) {
+                    commentThread.scrollIntoView();
+                }
+            }
+
+            function _comment_start_load(scroll = false) {
+                const commentThread = document.getElementById('comment-thread');
+                if (!commentThread) {
+                    return;
+                }
+                console.log(`start loading comments: ${location.href}`);
+                const version = Date.now().toString();
+                commentThread.setAttribute('init', version);
+                commentThread.querySelector('div.comment-topics').innerHTML = '';
+                // show loading:
+                commentThread.querySelector('div.comment-loading').style.display = 'block';
+                // hide info:
+                commentThread.querySelector('div.comment-info-failed').style.display = 'none';
+                commentThread.querySelector('div.comment-info-loaded').style.display = 'none';
+                fetch('https://api.liaoxuefeng.com/api/comments?url=' + encodeURIComponent(location.href))
+                    .then(resp => {
+                        resp.json().then(result => {
+                            const commentThread2 = document.getElementById('comment-thread');
+                            if (!commentThread2) {
+                                return;
+                            }
+                            if (commentThread2.getAttribute('init') !== version) {
+                                // dom changed:
+                                console.warn('skip load expired comments.');
+                                return;
+                            }
+                            // show info:
+                            const user = _comment_get_user();
+                            if (user === null) {
+                                // show signin:
+                                commentThread2.querySelector('span.comment-signin-state').style.display = 'none';
+                                commentThread2.querySelector('span.comment-signout-state').style.display = 'inline';
+                            } else {
+                                // show signout:
+                                commentThread2.querySelector('span.comment-signin-state').style.display = 'inline';
+                                commentThread2.querySelector('span.comment-signout-state').style.display = 'none';
+                                commentThread2.querySelector('span.comment-user-name').innerHTML = gitsite.encodeHtml(user.name);
+                            }
+                            commentThread2.querySelector('div.comment-info-loaded').style.display = 'block';
+                            _comment_loaded(commentThread2, result, scroll);
+                        });
+                    }).catch(err => {
+                        commentThread.querySelector('div.comment-info-failed').style.display = 'block';
+                    }).finally(() => {
+                        // hide loading:
+                        commentThread.querySelector('div.comment-loading').style.display = 'none';
+                    });
+            }
+
+            function _comment_oauth_signout() {
+                _comment_set_token('', '', 0);
+                _comment_start_load();
+            }
+
+            function _comment_oauth_signin() {
+                const origin = new URL('https://api.liaoxuefeng.com').origin;
+                let
+                    pw = 700,
+                    ph = 420,
+                    ww = window.outerWidth,
+                    wh = window.outerHeight,
+                    wl = window.screenLeft,
+                    wt = window.screenTop,
+                    pl = parseInt(wl + (ww - pw) / 2),
+                    pt = parseInt(wt + (wh - ph) / 2);
+                if (window.__oauth_popup_callback__ === undefined) {
+                    window.__oauth_popup_callback__ = true;
+                    window.addEventListener('message', (event) => {
+                        console.log('message from: ' + event.origin + ': ', event.data);
+                        if (event.origin === origin) {
+                            let oauthResult = event.data;
+                            console.log(oauthResult);
+                            if (oauthResult.success) {
+                                _comment_set_token(oauthResult.token, oauthResult.user, oauthResult.expires);
+                            }
+                            if (window.__oauth_popup__) {
+                                window.__oauth_popup__.close();
+                                window.__oauth_popup__ = null;
+                            }
+                            _comment_start_load();
+                        }
+                    });
+                }
+
+                window.__oauth_popup__ = window.open('https://api.liaoxuefeng.com/oauth_request', '__oauth_popup__', `popup=true,left=${pl},top=${pt},width=${pw},height=${ph}`);
+                window.__oauth_popup__.focus();
+            }
+
+            const fnOnScroll = () => {
+                const commentThread = document.getElementById('comment-thread');
+                if (!commentThread || commentThread.getAttribute('init') !== null) {
+                    return;
+                }
+                let winHeight = window.innerHeight;
+                let winOffsetY = window.scrollY;
+                let domTop = commentThread.offsetTop;
+                if (winHeight + winOffsetY + 20 > domTop) {
+                    _comment_start_load();
+                }
+            };
+
+            documentReady(() => {
+                window.addEventListener('scroll', fnOnScroll);
+                gitsite.addContentChangedListener(fnOnScroll);
+                fnOnScroll();
+            });
+
+            window.gitsite_comment = {
+                load: _comment_start_load,
+                signin: _comment_oauth_signin,
+                signout: _comment_oauth_signout,
+                reply: _comment_start_reply,
+                write: _comment_start_write,
+                preview: _comment_start_preview,
+                edit: _comment_edit,
+                post: _comment_post,
+                remove: _comment_remove
+            };
+
+            // end function
+        })();
+    }
+</script>
+
+<template id="comment-item">
+    <div class="comment-item border-t gsc-border pt-4" type="${type}" id="${id}">
+        <div class="comment-avatar">
+            <img class="border gsc-border" src="${user_image}">
+        </div>
+        <div class="comment-content">
+            <div>
+                <span class="comment-content-info">${user_name} @ ${created_at} ${delete_action}</span>
+            </div>
+            <div class="comment-content-text">${content}</div>
+            ${comment_replies}
+            ${comment_action}
+            ${comment_reply_form}
+        </div>
+    </div>
+</template>
+
+<template id="comment-form">
+    <div class="comment-form border-t gsc-border pt-4" type="${type}" id="${id}" style="${style}">
+        <div class="comment-item">
+            <div class="comment-avatar comment-current-user">
+                <img class="border gsc-border" src="${user_image}">
+            </div>
+            <div class="comment-content">
+                <div class="comment-toolbar">
+                    <span class="comment-write me-4">Write</span>
+                    <a href="#0" onclick="gitsite_comment.write(this)" class="comment-write me-4"
+                        style="display:none">Write</a>
+                    <span class="comment-preview me-4" style="display:none">Preview</span>
+                    <a href="#0" onclick="gitsite_comment.preview(this)" class="comment-preview me-4">Preview</a>
+                    <a href="#0" onclick="gitsite_comment.edit(this,'link')" class="comment-button me-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                            class="bi bi-link-45deg" viewBox="0 0 16 16">
+                            <path
+                                d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1 1 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4 4 0 0 1-.128-1.287z" />
+                            <path
+                                d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243z" />
+                        </svg>
+                    </a>
+                    <a href="#0" onclick="gitsite_comment.edit(this,'code')" class="comment-button me-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                            class="bi bi-code-slash" viewBox="0 0 16 16">
+                            <path
+                                d="M10.478 1.647a.5.5 0 1 0-.956-.294l-4 13a.5.5 0 0 0 .956.294zM4.854 4.146a.5.5 0 0 1 0 .708L1.707 8l3.147 3.146a.5.5 0 0 1-.708.708l-3.5-3.5a.5.5 0 0 1 0-.708l3.5-3.5a.5.5 0 0 1 .708 0m6.292 0a.5.5 0 0 0 0 .708L14.293 8l-3.147 3.146a.5.5 0 0 0 .708.708l3.5-3.5a.5.5 0 0 0 0-.708l-3.5-3.5a.5.5 0 0 0-.708 0" />
+                        </svg>
+                    </a>
+                    <a href="#0" onclick="gitsite_comment.edit(this,'ol')" class="comment-button me-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                            class="bi bi-list-ol" viewBox="0 0 16 16">
+                            <path fill-rule="evenodd"
+                                d="M5 11.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5" />
+                            <path
+                                d="M1.713 11.865v-.474H2c.217 0 .363-.137.363-.317 0-.185-.158-.31-.361-.31-.223 0-.367.152-.373.31h-.59c.016-.467.373-.787.986-.787.588-.002.954.291.957.703a.595.595 0 0 1-.492.594v.033a.615.615 0 0 1 .569.631c.003.533-.502.8-1.051.8-.656 0-1-.37-1.008-.794h.582c.008.178.186.306.422.309.254 0 .424-.145.422-.35-.002-.195-.155-.348-.414-.348h-.3zm-.004-4.699h-.604v-.035c0-.408.295-.844.958-.844.583 0 .96.326.96.756 0 .389-.257.617-.476.848l-.537.572v.03h1.054V9H1.143v-.395l.957-.99c.138-.142.293-.304.293-.508 0-.18-.147-.32-.342-.32a.33.33 0 0 0-.342.338zM2.564 5h-.635V2.924h-.031l-.598.42v-.567l.629-.443h.635z" />
+                        </svg>
+                    </a>
+                    <a href="#0" onclick="gitsite_comment.edit(this,'ul')" class="comment-button me-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                            class="bi bi-list-ul" viewBox="0 0 16 16">
+                            <path fill-rule="evenodd"
+                                d="M5 11.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m-3 1a1 1 0 1 0 0-2 1 1 0 0 0 0 2m0 4a1 1 0 1 0 0-2 1 1 0 0 0 0 2m0 4a1 1 0 1 0 0-2 1 1 0 0 0 0 2" />
+                        </svg>
+                    </a>
+                </div>
+                <div class="comment-form-edit">
+                    <textarea style="width:100%" rows="10" name="comment"
+                        placeholder="Write your comment using Markdown format..."></textarea>
+                </div>
+                <div class="comment-form-preview my-2 border-t border-b gsc-border" style="display:none"></div>
+                <div>
+                    <button type="button" onclick="gitsite_comment.post(this)">Post</button>
+                    <span class="comment-post-error"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<div id="comment-thread">
+    <h3>Comments</h3>
+    <div class="comment-loading my-4">
+        <svg class="animate-spin mr-2 h-5 w-5" style="display:inline" xmlns="http://www.w3.org/2000/svg" fill="none"
+            viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+            </path>
+        </svg>
+        Loading comments...
+    </div>
+    <div class="comment-info-failed my-4" style="display:none">Fail to load comments. Try
+        <a href="#0" onclick="gitsite_comment.load()">reload</a>.
+    </div>
+    <div class="comment-info-loaded my-4" style="display:none">Comments loaded.
+        <span class="comment-signout-state" style="display:none">To post a comment, please
+            <a href="#0" onclick="gitsite_comment.signin()">Sign In</a></span>
+        <span class="comment-signin-state" style="display:none">Hello, <span
+                class="comment-user-name font-semibold"></span>.
+            <a href="#0" onclick="gitsite_comment.signout()">Sign Out</a></span>
+    </div>
+    <div class="comment-topics">
+    </div>
+</div>
+
+<!--// oauth comment -->
+
+<!--// blog content -->

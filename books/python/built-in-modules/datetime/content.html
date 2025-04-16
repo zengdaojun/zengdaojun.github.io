@@ -1,0 +1,784 @@
+<!-- book content -->
+<div id="gsi-chapter">
+    <div id="gsi-chapter-title">
+        <h1>datetime</h1>
+    </div>
+    <div id="gsi-chapter-content">
+        <p>../git/BEFORE.md</p>
+<p><code>datetime</code>是Python处理日期和时间的标准库。</p>
+<h3>获取当前日期和时间</h3>
+<p>我们先看如何获取当前日期和时间：</p>
+<pre class="hljs"><code class="language-plain">&gt;&gt;&gt; from datetime import datetime
+&gt;&gt;&gt; now = datetime.now() # 获取当前datetime
+&gt;&gt;&gt; print(now)
+2015-05-18 16:28:07.198690
+&gt;&gt;&gt; print(type(now))
+&lt;class 'datetime.datetime'&gt;
+</code></pre>
+<p>注意到<code>datetime</code>是模块，<code>datetime</code>模块还包含一个<code>datetime</code>类，通过<code>from datetime import datetime</code>导入的才是<code>datetime</code>这个类。</p>
+<p>如果仅导入<code>import datetime</code>，则必须引用全名<code>datetime.datetime</code>。</p>
+<p><code>datetime.now()</code>返回当前日期和时间，其类型是<code>datetime</code>。</p>
+<h3>获取指定日期和时间</h3>
+<p>要指定某个日期和时间，我们直接用参数构造一个<code>datetime</code>：</p>
+<pre class="hljs"><code class="language-plain">&gt;&gt;&gt; from datetime import datetime
+&gt;&gt;&gt; dt = datetime(2015, 4, 19, 12, 20) # 用指定日期时间创建datetime
+&gt;&gt;&gt; print(dt)
+2015-04-19 12:20:00
+</code></pre>
+<h3>datetime转换为timestamp</h3>
+<p>在计算机中，时间实际上是用数字表示的。我们把1970年1月1日 00:00:00 UTC+00:00时区的时刻称为epoch time，记为<code>0</code>（1970年以前的时间timestamp为负数），当前时间就是相对于epoch time的秒数，称为timestamp。</p>
+<p>你可以认为：</p>
+<pre class="hljs"><code class="language-plain">timestamp = 0 = 1970-1-1 00:00:00 UTC+0:00
+</code></pre>
+<p>对应的北京时间是：</p>
+<pre class="hljs"><code class="language-plain">timestamp = 0 = 1970-1-1 08:00:00 UTC+8:00
+</code></pre>
+<p>可见timestamp的值与时区毫无关系，因为timestamp一旦确定，其UTC时间就确定了，转换到任意时区的时间也是完全确定的，这就是为什么计算机存储的当前时间是以timestamp表示的，因为全球各地的计算机在任意时刻的timestamp都是完全相同的（假定时间已校准）。</p>
+<p>把一个<code>datetime</code>类型转换为timestamp只需要简单调用<code>timestamp()</code>方法：</p>
+<pre class="hljs"><code class="language-plain">&gt;&gt;&gt; from datetime import datetime
+&gt;&gt;&gt; dt = datetime(2015, 4, 19, 12, 20) # 用指定日期时间创建datetime
+&gt;&gt;&gt; dt.timestamp() # 把datetime转换为timestamp
+1429417200.0
+</code></pre>
+<p>注意Python的timestamp是一个浮点数，整数位表示秒。</p>
+<p>某些编程语言（如Java和JavaScript）的timestamp使用整数表示毫秒数，这种情况下只需要把timestamp除以1000就得到Python的浮点表示方法。</p>
+<h3>timestamp转换为datetime</h3>
+<p>要把timestamp转换为<code>datetime</code>，使用<code>datetime</code>提供的<code>fromtimestamp()</code>方法：</p>
+<pre class="hljs"><code class="language-plain">&gt;&gt;&gt; from datetime import datetime
+&gt;&gt;&gt; t = 1429417200.0
+&gt;&gt;&gt; print(datetime.fromtimestamp(t))
+2015-04-19 12:20:00
+</code></pre>
+<p>注意到timestamp是一个浮点数，它没有时区的概念，而datetime是有时区的。上述转换是在timestamp和本地时间做转换。</p>
+<p>本地时间是指当前操作系统设定的时区。例如北京时区是东8区，则本地时间：</p>
+<pre class="hljs"><code class="language-plain">2015-04-19 12:20:00
+</code></pre>
+<p>实际上就是UTC+8:00时区的时间：</p>
+<pre class="hljs"><code class="language-plain">2015-04-19 12:20:00 UTC+8:00
+</code></pre>
+<p>而此刻的格林威治标准时间与北京时间差了8小时，也就是UTC+0:00时区的时间应该是：</p>
+<pre class="hljs"><code class="language-plain">2015-04-19 04:20:00 UTC+0:00
+</code></pre>
+<p>timestamp也可以直接被转换到UTC标准时区的时间：</p>
+<pre class="hljs"><code class="language-plain">&gt;&gt;&gt; from datetime import datetime
+&gt;&gt;&gt; t = 1429417200.0
+&gt;&gt;&gt; print(datetime.fromtimestamp(t)) # 本地时间
+2015-04-19 12:20:00
+&gt;&gt;&gt; print(datetime.utcfromtimestamp(t)) # UTC时间
+2015-04-19 04:20:00
+</code></pre>
+<h3>str转换为datetime</h3>
+<p>很多时候，用户输入的日期和时间是字符串，要处理日期和时间，首先必须把str转换为datetime。转换方法是通过<code>datetime.strptime()</code>实现，需要一个日期和时间的格式化字符串：</p>
+<pre class="hljs"><code class="language-plain">&gt;&gt;&gt; from datetime import datetime
+&gt;&gt;&gt; cday = datetime.strptime('2015-6-1 18:19:59', '%Y-%m-%d %H:%M:%S')
+&gt;&gt;&gt; print(cday)
+2015-06-01 18:19:59
+</code></pre>
+<p>字符串<code>'%Y-%m-%d %H:%M:%S'</code>规定了日期和时间部分的格式。详细的说明请参考<a href="https://docs.python.org/3/library/datetime.html#strftime-strptime-behavior" target="_blank">Python文档</a>。</p>
+<p>注意转换后的datetime是没有时区信息的。</p>
+<h3>datetime转换为str</h3>
+<p>如果已经有了datetime对象，要把它格式化为字符串显示给用户，就需要转换为str，转换方法是通过<code>strftime()</code>实现的，同样需要一个日期和时间的格式化字符串：</p>
+<pre class="hljs"><code class="language-plain">&gt;&gt;&gt; from datetime import datetime
+&gt;&gt;&gt; now = datetime.now()
+&gt;&gt;&gt; print(now.strftime('%a, %b %d %H:%M'))
+Mon, May 05 16:28
+</code></pre>
+<h3>datetime加减</h3>
+<p>对日期和时间进行加减实际上就是把datetime往后或往前计算，得到新的datetime。加减可以直接用<code>+</code>和<code>-</code>运算符，不过需要导入<code>timedelta</code>这个类：</p>
+<pre class="hljs"><code class="language-plain">&gt;&gt;&gt; from datetime import datetime, timedelta
+&gt;&gt;&gt; now = datetime.now()
+&gt;&gt;&gt; now
+datetime.datetime(2015, 5, 18, 16, 57, 3, 540997)
+&gt;&gt;&gt; now + timedelta(hours=10)
+datetime.datetime(2015, 5, 19, 2, 57, 3, 540997)
+&gt;&gt;&gt; now - timedelta(days=1)
+datetime.datetime(2015, 5, 17, 16, 57, 3, 540997)
+&gt;&gt;&gt; now + timedelta(days=2, hours=12)
+datetime.datetime(2015, 5, 21, 4, 57, 3, 540997)
+</code></pre>
+<p>可见，使用<code>timedelta</code>你可以很容易地算出前几天和后几天的时刻。</p>
+<h3>本地时间转换为UTC时间</h3>
+<p>本地时间是指系统设定时区的时间，例如北京时间是UTC+8:00时区的时间，而UTC时间指UTC+0:00时区的时间。</p>
+<p>一个<code>datetime</code>类型有一个时区属性<code>tzinfo</code>，但是默认为<code>None</code>，所以无法区分这个<code>datetime</code>到底是哪个时区，除非强行给<code>datetime</code>设置一个时区：</p>
+<pre class="hljs"><code class="language-plain">&gt;&gt;&gt; from datetime import datetime, timedelta, timezone
+&gt;&gt;&gt; tz_utc_8 = timezone(timedelta(hours=8)) # 创建时区UTC+8:00
+&gt;&gt;&gt; now = datetime.now()
+&gt;&gt;&gt; now
+datetime.datetime(2015, 5, 18, 17, 2, 10, 871012)
+&gt;&gt;&gt; dt = now.replace(tzinfo=tz_utc_8) # 强制设置为UTC+8:00
+&gt;&gt;&gt; dt
+datetime.datetime(2015, 5, 18, 17, 2, 10, 871012, tzinfo=datetime.timezone(datetime.timedelta(0, 28800)))
+</code></pre>
+<p>如果系统时区恰好是UTC+8:00，那么上述代码就是正确的，否则，不能强制设置为UTC+8:00时区。</p>
+<h3>时区转换</h3>
+<p>我们可以先通过<code>utcnow()</code>拿到当前的UTC时间，再转换为任意时区的时间：</p>
+<pre class="hljs"><code class="language-plain"># 拿到UTC时间，并强制设置时区为UTC+0:00:
+&gt;&gt;&gt; utc_dt = datetime.utcnow().replace(tzinfo=timezone.utc)
+&gt;&gt;&gt; print(utc_dt)
+2015-05-18 09:05:12.377316+00:00
+# astimezone()将转换时区为北京时间:
+&gt;&gt;&gt; bj_dt = utc_dt.astimezone(timezone(timedelta(hours=8)))
+&gt;&gt;&gt; print(bj_dt)
+2015-05-18 17:05:12.377316+08:00
+# astimezone()将转换时区为东京时间:
+&gt;&gt;&gt; tokyo_dt = utc_dt.astimezone(timezone(timedelta(hours=9)))
+&gt;&gt;&gt; print(tokyo_dt)
+2015-05-18 18:05:12.377316+09:00
+# astimezone()将bj_dt转换时区为东京时间:
+&gt;&gt;&gt; tokyo_dt2 = bj_dt.astimezone(timezone(timedelta(hours=9)))
+&gt;&gt;&gt; print(tokyo_dt2)
+2015-05-18 18:05:12.377316+09:00
+</code></pre>
+<p>时区转换的关键在于，拿到一个<code>datetime</code>时，要获知其正确的时区，然后强制设置时区，作为基准时间。</p>
+<p>利用带时区的<code>datetime</code>，通过<code>astimezone()</code>方法，可以转换到任意时区。</p>
+<p>注：不是必须从UTC+0:00时区转换到其他时区，任何带时区的<code>datetime</code>都可以正确转换，例如上述<code>bj_dt</code>到<code>tokyo_dt</code>的转换。</p>
+<h3>小结</h3>
+<p><code>datetime</code>表示的时间需要时区信息才能确定一个特定的时间，否则只能视为本地时间。</p>
+<p>如果要存储<code>datetime</code>，最佳方法是将其转换为timestamp再存储，因为timestamp的值与时区完全无关。</p>
+<h3>练习</h3>
+<p>假设你获取了用户输入的日期和时间如<code>2015-1-21 9:01:30</code>，以及一个时区信息如<code>UTC+5:00</code>，均是<code>str</code>，请编写一个函数将其转换为timestamp：</p>
+<pre class="hljs"><code class="language-python"><span class="hljs-comment"># -*- coding:utf-8 -*-</span>
+
+<span class="hljs-keyword">import</span> re
+<span class="hljs-keyword">from</span> datetime <span class="hljs-keyword">import</span> datetime, timezone, timedelta
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">to_timestamp</span>(<span class="hljs-params">dt_str, tz_str</span>):
+    <span class="hljs-keyword">pass</span>
+
+<span class="hljs-comment"># 测试:</span>
+t1 = to_timestamp(<span class="hljs-string">&#x27;2015-6-1 08:10:30&#x27;</span>, <span class="hljs-string">&#x27;UTC+7:00&#x27;</span>)
+<span class="hljs-keyword">assert</span> t1 == <span class="hljs-number">1433121030.0</span>, t1
+
+t2 = to_timestamp(<span class="hljs-string">&#x27;2015-5-31 16:10:30&#x27;</span>, <span class="hljs-string">&#x27;UTC-09:00&#x27;</span>)
+<span class="hljs-keyword">assert</span> t2 == <span class="hljs-number">1433121030.0</span>, t2
+
+<span class="hljs-built_in">print</span>(<span class="hljs-string">&#x27;ok&#x27;</span>)
+</code></pre>
+<h3>参考源码</h3>
+<p><a href="use_datetime.py">use_datetime.py</a></p>
+
+    </div>
+
+
+
+
+
+
+    <hr class="gsc-border">
+    <div id="gsi-chapter-prev-next" class="flex flex-row mt-4">
+        <div id="gsi-chapter-prev" class="basis-1/2 mr-2 text-left">
+
+            <a href="/books/python/built-in-modules/index.html"
+                onclick="gs_load_chapter('/books/python/built-in-modules/index.html',true);return false;"
+                class="inline-block my-2">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M18.75 19.5l-7.5-7.5 7.5-7.5m-6 15L5.25 12l7.5-7.5" />
+                </svg>
+                常用内建模块
+            </a>
+
+        </div>
+        <div id="gsi-chapter-next" class="basis-1/2 ml-2 text-right">
+
+            <a href="/books/python/built-in-modules/collections/index.html"
+                onclick="gs_load_chapter('/books/python/built-in-modules/collections/index.html',true);return false;"
+                class="inline-block my-2">
+                collections
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M11.25 4.5l7.5 7.5-7.5 7.5m-6-15l7.5 7.5-7.5 7.5" />
+                </svg>
+            </a>
+
+        </div>
+    </div>
+</div>
+
+
+<!-- oauth comment -->
+
+<hr class="gsc-border mt-4">
+<div class="mb-4"></div>
+<style>
+    div.comment-item {
+        display: flex;
+        max-width: 100%;
+        padding-bottom: 16px;
+    }
+
+    div.comment-item>div.comment-avatar {
+        flex-shrink: 0;
+        padding-right: 16px;
+    }
+
+    div.comment-item>div.comment-avatar>img {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+    }
+
+    div.comment-item>div.comment-content {
+        flex-grow: 1;
+        overflow: auto;
+    }
+</style>
+<script src="/static/markdown-it.min.js"></script>
+<script>
+    if (window.gitsite_comment === undefined) {
+        (function () {
+            const MAX_COMMENT_HEIGHT = 400;
+            // begin function
+            function _comment_set_token(token, user, expires) {
+                localStorage.setItem('_comment_token_', token);
+                localStorage.setItem('_comment_user_', JSON.stringify(user));
+                localStorage.setItem('_comment_expires_', expires.toString());
+            }
+
+            function _comment_get_user() {
+                const expires = parseInt(localStorage.getItem('_comment_expires_') || '0');
+                if (Date.now() > expires) {
+                    return null;
+                }
+                return JSON.parse(localStorage.getItem('_comment_user_'));
+            }
+
+            function _comment_get_token() {
+                const expires = parseInt(localStorage.getItem('_comment_expires_') || '0');
+                if (Date.now() > expires) {
+                    return null;
+                }
+                return localStorage.getItem('_comment_token_');
+            }
+
+            function _comment_markdown_render(text, autoCollapse = true) {
+                const md = markdownit();
+                const defaultRender = md.renderer.rules.link_open || function (tokens, idx, options, env, self) {
+                    return self.renderToken(tokens, idx, options);
+                };
+                md.renderer.rules.link_open = function (tokens, idx, options, env, self) {
+                    // Add a new `target` attribute, or replace the value of the existing one.
+                    tokens[idx].attrSet('target', '_blank');
+                    tokens[idx].attrSet('rel', 'nofollow');
+                    // Pass the token to the default renderer.
+                    return defaultRender(tokens, idx, options, env, self);
+                };
+                if (autoCollapse) {
+                    return '<div class="x-auto-collapse">' + md.render(text) + '</div>';
+                }
+                return md.render(text);
+            }
+
+            function _comment_remove(btn, msg) {
+                if (!confirm(msg)) {
+                    return;
+                }
+                const item = _comment_find_parent(btn, 'comment-item');
+                const type = item.getAttribute('type');
+                const id = item.getAttribute('id');
+                const token = _comment_get_token();
+                let path = null;
+                let data = {};
+                if (type === 'comment') {
+                    path = '/api/comments';
+                    data.commentId = id;
+                } else if (type === 'reply') {
+                    path = '/api/replies';
+                    data.replyId = id;
+                } else {
+                    throw 'invalid type';
+                }
+                btn.style.display = 'none';
+                fetch('https://api.liaoxuefeng.com' + path, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': 'Bearer: ' + token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                }).then(resp => {
+                    console.log('delete ok.');
+                    _comment_start_load(true);
+                }).catch(err => {
+                    console.error(err);
+                });
+            }
+
+            function _comment_post(btn) {
+                const form = _comment_find_parent(btn, 'comment-form');
+                const err = form.querySelector('span.comment-post-error');
+                const token = _comment_get_token();
+                if (!token) {
+                    err.innerHTML = 'Please sign in first.';
+                    return;
+                }
+                const textarea = form.querySelector('textarea');
+                const content = textarea.value.trim();
+                if (content === '') {
+                    err.innerHTML = 'content is empty.';
+                    return;
+                }
+                const type = form.getAttribute('type');
+                const id = form.getAttribute('id');
+                let data = {
+                    content: content
+                };
+                let path = null;
+                if (type === 'comment') {
+                    data.pageUrl = id;
+                    path = '/api/comments';
+                } else if (type === 'reply') {
+                    data.commentId = id;
+                    path = '/api/replies';
+                } else {
+                    err.innerHTML = 'invalid type.';
+                    return;
+                }
+                console.log(data);
+                err.innerHTML = '';
+                btn.disabled = true;
+
+                fetch('https://api.liaoxuefeng.com' + path, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer: ' + token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                }).then(resp => {
+                    resp.json().then(obj => {
+                        if (obj.error) {
+                            console.error(obj.error, obj.message);
+                            err.innerHTML = (obj.message || obj.error).toString();
+                        } else {
+                            console.log('post comment ok.');
+                            textarea.value = '';
+                            _comment_start_load(true);
+                        }
+                    });
+                }).catch(err => {
+                    console.error(err);
+                    err.innerHTML = err.toString();
+                }).finally(() => {
+                    btn.disabled = false;
+                });
+            }
+
+            function _comment_has_class(dom, className) {
+                for (let i = 0; i < dom.classList.length; i++) {
+                    if (dom.classList[i] === className) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            function _comment_find_parent(dom, className) {
+                while (!_comment_has_class(dom, className)) {
+                    dom = dom.parentElement;
+                }
+                return dom;
+            }
+
+            function _comment_start_reply(dom) {
+                const actions = _comment_find_parent(dom, 'comment-action');
+                const item = _comment_find_parent(dom, 'comment-item');
+                const form = item.querySelector('div.comment-form');
+                actions.style.display = 'none';
+                form.style.display = 'block';
+            }
+
+            function _comment_start_write(dom) {
+                const form = _comment_find_parent(dom, 'comment-form');
+                form.querySelector('div.comment-toolbar span.comment-write').style.display = 'inline';
+                form.querySelector('div.comment-toolbar a.comment-write').style.display = 'none';
+                form.querySelector('div.comment-toolbar span.comment-preview').style.display = 'none';
+                form.querySelector('div.comment-toolbar a.comment-preview').style.display = 'inline';
+                form.querySelectorAll('div.comment-toolbar a.comment-button').forEach(a => a.style.display = 'inline');
+                form.querySelector('div.comment-form-edit').style.display = 'block';
+                form.querySelector('div.comment-form-preview').style.display = 'none';
+            }
+
+            function _comment_start_preview(dom) {
+                const form = _comment_find_parent(dom, 'comment-form');
+                form.querySelector('div.comment-toolbar span.comment-write').style.display = 'none';
+                form.querySelector('div.comment-toolbar a.comment-write').style.display = 'inline';
+                form.querySelector('div.comment-toolbar span.comment-preview').style.display = 'inline';
+                form.querySelector('div.comment-toolbar a.comment-preview').style.display = 'none';
+                form.querySelectorAll('div.comment-toolbar a.comment-button').forEach(a => a.style.display = 'none');
+                form.querySelector('div.comment-form-edit').style.display = 'none';
+                const preview = form.querySelector('div.comment-form-preview');
+                const text = form.querySelector('textarea').value.trim() || '(empty)';
+                preview.innerHTML = _comment_markdown_render(text, false);
+                preview.style.display = 'block';
+            }
+
+            function _comment_edit(dom, command) {
+                const form = _comment_find_parent(dom, 'comment-form');
+                let insert = '';
+                switch (command) {
+                    case 'link':
+                        insert = '[link](https://example.com/)'
+                        break;
+                    case 'code':
+                        insert = '\n\n```\npaste code here...\n```\n\n';
+                        break;
+                    case 'ol':
+                        insert = '\n\n- item 1\n- item 2\n- item 3\n\n';
+                        break;
+                    case 'ul':
+                        insert = '\n\n1. item 1\n2. item 2\n3. item 3\n\n';
+                        break;
+                }
+                if (insert) {
+                    const textarea = form.querySelector('textarea');
+                    const position = textarea.selectionStart;
+                    const value = textarea.value;
+                    // Get the text before and after the cursor position
+                    const before = value.substring(0, position);
+                    const after = value.substring(position, value.length);
+
+                    // Insert the new text at the cursor position
+                    textarea.value = before + insert + after;
+
+                    // Set the cursor position to after the newly inserted text
+                    textarea.selectionStart = textarea.selectionEnd = position + insert.length;
+                    textarea.focus();
+                }
+            }
+
+            function _comment_render_template(str, obj) {
+                const keys = Object.keys(obj);
+                for (let key of keys) {
+                    let value = obj[key];
+                    str = str.replaceAll(new RegExp('\\$\\{' + key + '\\}', 'g'), value);
+                }
+                return str;
+            }
+
+            function _comment_loaded(commentThread, result, scroll) {
+                console.log('comments loaded ok.');
+                const itemTempl = document.getElementById('comment-item').innerHTML;
+                const formTempl = document.getElementById('comment-form').innerHTML;
+                const me = _comment_get_user();
+                console.log(result);
+                const action_delete_comment = '<a href="#0" onclick="gitsite_comment.remove(this, \'Confirm delete this comment?\')">Delete</a>';
+                const action_delete_reply = '<a href="#0" onclick="gitsite_comment.remove(this, \'Confirm delete this reply?\')">Delete</a>';
+                let comment_doms = result.comments.map(comment => {
+                    const action_reply = '<div class="comment-action pt-4 border-t gsc-border"><a href="#0" onclick="gitsite_comment.reply(this)">Reply</a></div>';
+                    const can_delete_comment = me !== null && (me.role === 1000 || me.id === comment.user_id);
+                    let model = {
+                        type: 'comment',
+                        id: comment.id,
+                        user_image: comment.user_image,
+                        user_name: gitsite.encodeHtml(comment.user_name),
+                        created_at: new Date(comment.created_at).toLocaleString(),
+                        content: _comment_markdown_render(comment.content),
+                        comment_reply_form: '',
+                        comment_action: me === null ? '' : action_reply,
+                        delete_action: can_delete_comment ? action_delete_comment : ''
+                    }
+                    let reply_doms = comment.replies.map(reply => {
+                        const can_delete_reply = me !== null && (me.role === 1000 || me.id === reply.user_id);
+                        let replyModel = {
+                            type: 'reply',
+                            id: reply.id,
+                            user_image: reply.user_image,
+                            user_name: gitsite.encodeHtml(reply.user_name),
+                            created_at: new Date(reply.created_at).toLocaleString(),
+                            content: _comment_markdown_render(reply.content),
+                            comment_reply_form: '',
+                            comment_replies: '',
+                            comment_action: '',
+                            delete_action: can_delete_reply ? action_delete_reply : ''
+                        };
+                        return _comment_render_template(itemTempl, replyModel);
+                    });
+                    model.comment_replies = reply_doms.join('');
+                    // set comment_reply_form:
+                    if (me !== null) {
+                        model.comment_reply_form = _comment_render_template(formTempl, {
+                            type: 'reply',
+                            id: comment.id,
+                            style: 'display:none',
+                            user_name: me.name,
+                            user_image: me.image
+                        });
+                    }
+                    return _comment_render_template(itemTempl, model);
+                });
+                let html = comment_doms.join('');
+                if (me !== null) {
+                    let comment_form = _comment_render_template(formTempl, {
+                        type: 'comment',
+                        id: location.href,
+                        style: '',
+                        user_name: me.name,
+                        user_image: me.image
+                    });
+                    html = html + comment_form;
+                }
+                commentThread.querySelector('div.comment-loading').style.display = 'none';
+                commentThread.querySelector('div.comment-topics').innerHTML = html;
+                commentThread.querySelectorAll('div.comment-topics div.x-auto-collapse').forEach(div => {
+                    if (div.scrollHeight <= MAX_COMMENT_HEIGHT + 60) {
+                        return;
+                    }
+                    div.style.maxHeight = MAX_COMMENT_HEIGHT + 'px';
+                    div.style.overflow = 'hidden';
+                    let p = document.createElement('p');
+                    p.innerHTML = '<a href="#0" class="x-read-more">Read More ▼</a><a href="#0" class="x-collapse" style="display:none">Collapse ▲</a>';
+                    div.parentNode.appendChild(p);
+                    const aReadMore = p.querySelector('a.x-read-more');
+                    const aCollapse = p.querySelector('a.x-collapse');
+                    aReadMore.onclick = () => {
+                        div.style.maxHeight = null;
+                        div.style.overflow = null;
+                        aReadMore.style.display = 'none';
+                        aCollapse.style.display = null;
+                    };
+                    aCollapse.onclick = () => {
+                        div.style.maxHeight = MAX_COMMENT_HEIGHT + 'px';
+                        div.style.overflow = 'hidden';
+                        aReadMore.style.display = null;
+                        aCollapse.style.display = 'none';
+                        div.parentNode.parentNode.scrollIntoView();
+                    };
+                });
+                if (scroll) {
+                    commentThread.scrollIntoView();
+                }
+            }
+
+            function _comment_start_load(scroll = false) {
+                const commentThread = document.getElementById('comment-thread');
+                if (!commentThread) {
+                    return;
+                }
+                console.log(`start loading comments: ${location.href}`);
+                const version = Date.now().toString();
+                commentThread.setAttribute('init', version);
+                commentThread.querySelector('div.comment-topics').innerHTML = '';
+                // show loading:
+                commentThread.querySelector('div.comment-loading').style.display = 'block';
+                // hide info:
+                commentThread.querySelector('div.comment-info-failed').style.display = 'none';
+                commentThread.querySelector('div.comment-info-loaded').style.display = 'none';
+                fetch('https://api.liaoxuefeng.com/api/comments?url=' + encodeURIComponent(location.href))
+                    .then(resp => {
+                        resp.json().then(result => {
+                            const commentThread2 = document.getElementById('comment-thread');
+                            if (!commentThread2) {
+                                return;
+                            }
+                            if (commentThread2.getAttribute('init') !== version) {
+                                // dom changed:
+                                console.warn('skip load expired comments.');
+                                return;
+                            }
+                            // show info:
+                            const user = _comment_get_user();
+                            if (user === null) {
+                                // show signin:
+                                commentThread2.querySelector('span.comment-signin-state').style.display = 'none';
+                                commentThread2.querySelector('span.comment-signout-state').style.display = 'inline';
+                            } else {
+                                // show signout:
+                                commentThread2.querySelector('span.comment-signin-state').style.display = 'inline';
+                                commentThread2.querySelector('span.comment-signout-state').style.display = 'none';
+                                commentThread2.querySelector('span.comment-user-name').innerHTML = gitsite.encodeHtml(user.name);
+                            }
+                            commentThread2.querySelector('div.comment-info-loaded').style.display = 'block';
+                            _comment_loaded(commentThread2, result, scroll);
+                        });
+                    }).catch(err => {
+                        commentThread.querySelector('div.comment-info-failed').style.display = 'block';
+                    }).finally(() => {
+                        // hide loading:
+                        commentThread.querySelector('div.comment-loading').style.display = 'none';
+                    });
+            }
+
+            function _comment_oauth_signout() {
+                _comment_set_token('', '', 0);
+                _comment_start_load();
+            }
+
+            function _comment_oauth_signin() {
+                const origin = new URL('https://api.liaoxuefeng.com').origin;
+                let
+                    pw = 700,
+                    ph = 420,
+                    ww = window.outerWidth,
+                    wh = window.outerHeight,
+                    wl = window.screenLeft,
+                    wt = window.screenTop,
+                    pl = parseInt(wl + (ww - pw) / 2),
+                    pt = parseInt(wt + (wh - ph) / 2);
+                if (window.__oauth_popup_callback__ === undefined) {
+                    window.__oauth_popup_callback__ = true;
+                    window.addEventListener('message', (event) => {
+                        console.log('message from: ' + event.origin + ': ', event.data);
+                        if (event.origin === origin) {
+                            let oauthResult = event.data;
+                            console.log(oauthResult);
+                            if (oauthResult.success) {
+                                _comment_set_token(oauthResult.token, oauthResult.user, oauthResult.expires);
+                            }
+                            if (window.__oauth_popup__) {
+                                window.__oauth_popup__.close();
+                                window.__oauth_popup__ = null;
+                            }
+                            _comment_start_load();
+                        }
+                    });
+                }
+
+                window.__oauth_popup__ = window.open('https://api.liaoxuefeng.com/oauth_request', '__oauth_popup__', `popup=true,left=${pl},top=${pt},width=${pw},height=${ph}`);
+                window.__oauth_popup__.focus();
+            }
+
+            const fnOnScroll = () => {
+                const commentThread = document.getElementById('comment-thread');
+                if (!commentThread || commentThread.getAttribute('init') !== null) {
+                    return;
+                }
+                let winHeight = window.innerHeight;
+                let winOffsetY = window.scrollY;
+                let domTop = commentThread.offsetTop;
+                if (winHeight + winOffsetY + 20 > domTop) {
+                    _comment_start_load();
+                }
+            };
+
+            documentReady(() => {
+                window.addEventListener('scroll', fnOnScroll);
+                gitsite.addContentChangedListener(fnOnScroll);
+                fnOnScroll();
+            });
+
+            window.gitsite_comment = {
+                load: _comment_start_load,
+                signin: _comment_oauth_signin,
+                signout: _comment_oauth_signout,
+                reply: _comment_start_reply,
+                write: _comment_start_write,
+                preview: _comment_start_preview,
+                edit: _comment_edit,
+                post: _comment_post,
+                remove: _comment_remove
+            };
+
+            // end function
+        })();
+    }
+</script>
+
+<template id="comment-item">
+    <div class="comment-item border-t gsc-border pt-4" type="${type}" id="${id}">
+        <div class="comment-avatar">
+            <img class="border gsc-border" src="${user_image}">
+        </div>
+        <div class="comment-content">
+            <div>
+                <span class="comment-content-info">${user_name} @ ${created_at} ${delete_action}</span>
+            </div>
+            <div class="comment-content-text">${content}</div>
+            ${comment_replies}
+            ${comment_action}
+            ${comment_reply_form}
+        </div>
+    </div>
+</template>
+
+<template id="comment-form">
+    <div class="comment-form border-t gsc-border pt-4" type="${type}" id="${id}" style="${style}">
+        <div class="comment-item">
+            <div class="comment-avatar comment-current-user">
+                <img class="border gsc-border" src="${user_image}">
+            </div>
+            <div class="comment-content">
+                <div class="comment-toolbar">
+                    <span class="comment-write me-4">Write</span>
+                    <a href="#0" onclick="gitsite_comment.write(this)" class="comment-write me-4"
+                        style="display:none">Write</a>
+                    <span class="comment-preview me-4" style="display:none">Preview</span>
+                    <a href="#0" onclick="gitsite_comment.preview(this)" class="comment-preview me-4">Preview</a>
+                    <a href="#0" onclick="gitsite_comment.edit(this,'link')" class="comment-button me-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                            class="bi bi-link-45deg" viewBox="0 0 16 16">
+                            <path
+                                d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1 1 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4 4 0 0 1-.128-1.287z" />
+                            <path
+                                d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243z" />
+                        </svg>
+                    </a>
+                    <a href="#0" onclick="gitsite_comment.edit(this,'code')" class="comment-button me-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                            class="bi bi-code-slash" viewBox="0 0 16 16">
+                            <path
+                                d="M10.478 1.647a.5.5 0 1 0-.956-.294l-4 13a.5.5 0 0 0 .956.294zM4.854 4.146a.5.5 0 0 1 0 .708L1.707 8l3.147 3.146a.5.5 0 0 1-.708.708l-3.5-3.5a.5.5 0 0 1 0-.708l3.5-3.5a.5.5 0 0 1 .708 0m6.292 0a.5.5 0 0 0 0 .708L14.293 8l-3.147 3.146a.5.5 0 0 0 .708.708l3.5-3.5a.5.5 0 0 0 0-.708l-3.5-3.5a.5.5 0 0 0-.708 0" />
+                        </svg>
+                    </a>
+                    <a href="#0" onclick="gitsite_comment.edit(this,'ol')" class="comment-button me-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                            class="bi bi-list-ol" viewBox="0 0 16 16">
+                            <path fill-rule="evenodd"
+                                d="M5 11.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5" />
+                            <path
+                                d="M1.713 11.865v-.474H2c.217 0 .363-.137.363-.317 0-.185-.158-.31-.361-.31-.223 0-.367.152-.373.31h-.59c.016-.467.373-.787.986-.787.588-.002.954.291.957.703a.595.595 0 0 1-.492.594v.033a.615.615 0 0 1 .569.631c.003.533-.502.8-1.051.8-.656 0-1-.37-1.008-.794h.582c.008.178.186.306.422.309.254 0 .424-.145.422-.35-.002-.195-.155-.348-.414-.348h-.3zm-.004-4.699h-.604v-.035c0-.408.295-.844.958-.844.583 0 .96.326.96.756 0 .389-.257.617-.476.848l-.537.572v.03h1.054V9H1.143v-.395l.957-.99c.138-.142.293-.304.293-.508 0-.18-.147-.32-.342-.32a.33.33 0 0 0-.342.338zM2.564 5h-.635V2.924h-.031l-.598.42v-.567l.629-.443h.635z" />
+                        </svg>
+                    </a>
+                    <a href="#0" onclick="gitsite_comment.edit(this,'ul')" class="comment-button me-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                            class="bi bi-list-ul" viewBox="0 0 16 16">
+                            <path fill-rule="evenodd"
+                                d="M5 11.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m-3 1a1 1 0 1 0 0-2 1 1 0 0 0 0 2m0 4a1 1 0 1 0 0-2 1 1 0 0 0 0 2m0 4a1 1 0 1 0 0-2 1 1 0 0 0 0 2" />
+                        </svg>
+                    </a>
+                </div>
+                <div class="comment-form-edit">
+                    <textarea style="width:100%" rows="10" name="comment"
+                        placeholder="Write your comment using Markdown format..."></textarea>
+                </div>
+                <div class="comment-form-preview my-2 border-t border-b gsc-border" style="display:none"></div>
+                <div>
+                    <button type="button" onclick="gitsite_comment.post(this)">Post</button>
+                    <span class="comment-post-error"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<div id="comment-thread">
+    <h3>Comments</h3>
+    <div class="comment-loading my-4">
+        <svg class="animate-spin mr-2 h-5 w-5" style="display:inline" xmlns="http://www.w3.org/2000/svg" fill="none"
+            viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+            </path>
+        </svg>
+        Loading comments...
+    </div>
+    <div class="comment-info-failed my-4" style="display:none">Fail to load comments. Try
+        <a href="#0" onclick="gitsite_comment.load()">reload</a>.
+    </div>
+    <div class="comment-info-loaded my-4" style="display:none">Comments loaded.
+        <span class="comment-signout-state" style="display:none">To post a comment, please
+            <a href="#0" onclick="gitsite_comment.signin()">Sign In</a></span>
+        <span class="comment-signin-state" style="display:none">Hello, <span
+                class="comment-user-name font-semibold"></span>.
+            <a href="#0" onclick="gitsite_comment.signout()">Sign Out</a></span>
+    </div>
+    <div class="comment-topics">
+    </div>
+</div>
+
+<!--// oauth comment -->
+
+<!--// book content -->

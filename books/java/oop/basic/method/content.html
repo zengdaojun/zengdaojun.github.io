@@ -1,0 +1,952 @@
+<!-- book content -->
+<div id="gsi-chapter">
+    <div id="gsi-chapter-title">
+        <h1>方法</h1>
+    </div>
+    <div id="gsi-chapter-content">
+        <p>../git/BEFORE.md</p>
+<p>一个<code>class</code>可以包含多个<code>field</code>，例如，我们给<code>Person</code>类就定义了两个<code>field</code>：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-keyword">class</span> <span class="hljs-title class_">Person</span> {
+    <span class="hljs-keyword">public</span> String name;
+    <span class="hljs-keyword">public</span> <span class="hljs-type">int</span> age;
+}
+</code></pre>
+<p>但是，直接把<code>field</code>用<code>public</code>暴露给外部可能会破坏封装性。比如，代码可以这样写：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-type">Person</span> <span class="hljs-variable">ming</span> <span class="hljs-operator">=</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Person</span>();
+ming.name = <span class="hljs-string">&quot;Xiao Ming&quot;</span>;
+ming.age = -<span class="hljs-number">99</span>; <span class="hljs-comment">// age设置为负数 </span>
+</code></pre>
+<p>显然，直接操作<code>field</code>，容易造成逻辑混乱。为了避免外部代码直接去访问<code>field</code>，我们可以用<code>private</code>修饰<code>field</code>，拒绝外部访问：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-keyword">class</span> <span class="hljs-title class_">Person</span> {
+    <span class="hljs-keyword">private</span> String name;
+    <span class="hljs-keyword">private</span> <span class="hljs-type">int</span> age;
+}
+</code></pre>
+<p>试试<code>private</code>修饰的<code>field</code>有什么效果：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-comment">// private field</span>
+<span class="hljs-keyword">public</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">Main</span> {
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">static</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">main</span><span class="hljs-params">(String[] args)</span> {
+        <span class="hljs-type">Person</span> <span class="hljs-variable">ming</span> <span class="hljs-operator">=</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Person</span>();
+        ming.name = <span class="hljs-string">&quot;Xiao Ming&quot;</span>; <span class="hljs-comment">// 对字段name赋值</span>
+        ming.age = <span class="hljs-number">12</span>; <span class="hljs-comment">// 对字段age赋值</span>
+    }
+}
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">Person</span> {
+    <span class="hljs-keyword">private</span> String name;
+    <span class="hljs-keyword">private</span> <span class="hljs-type">int</span> age;
+}
+</code></pre>
+<p>是不是编译报错？把访问<code>field</code>的赋值语句去了就可以正常编译了。</p>
+<p><img src="compile-error.png" alt="compile-error" loading="lazy"></p>
+<p>把<code>field</code>从<code>public</code>改成<code>private</code>，外部代码不能访问这些<code>field</code>，那我们定义这些<code>field</code>有什么用？怎么才能给它赋值？怎么才能读取它的值？</p>
+<p>所以我们需要使用方法（<code>method</code>）来让外部代码可以间接修改<code>field</code>：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-comment">// private field</span>
+<span class="hljs-keyword">public</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">Main</span> {
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">static</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">main</span><span class="hljs-params">(String[] args)</span> {
+        <span class="hljs-type">Person</span> <span class="hljs-variable">ming</span> <span class="hljs-operator">=</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Person</span>();
+        ming.setName(<span class="hljs-string">&quot;Xiao Ming&quot;</span>); <span class="hljs-comment">// 设置name</span>
+        ming.setAge(<span class="hljs-number">12</span>); <span class="hljs-comment">// 设置age</span>
+        System.out.println(ming.getName() + <span class="hljs-string">&quot;, &quot;</span> + ming.getAge());
+    }
+}
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">Person</span> {
+    <span class="hljs-keyword">private</span> String name;
+    <span class="hljs-keyword">private</span> <span class="hljs-type">int</span> age;
+
+    <span class="hljs-keyword">public</span> String <span class="hljs-title function_">getName</span><span class="hljs-params">()</span> {
+        <span class="hljs-keyword">return</span> <span class="hljs-built_in">this</span>.name;
+    }
+
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">setName</span><span class="hljs-params">(String name)</span> {
+        <span class="hljs-built_in">this</span>.name = name;
+    }
+
+    <span class="hljs-keyword">public</span> <span class="hljs-type">int</span> <span class="hljs-title function_">getAge</span><span class="hljs-params">()</span> {
+        <span class="hljs-keyword">return</span> <span class="hljs-built_in">this</span>.age;
+    }
+
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">setAge</span><span class="hljs-params">(<span class="hljs-type">int</span> age)</span> {
+        <span class="hljs-keyword">if</span> (age &lt; <span class="hljs-number">0</span> || age &gt; <span class="hljs-number">100</span>) {
+            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">IllegalArgumentException</span>(<span class="hljs-string">&quot;invalid age value&quot;</span>);
+        }
+        <span class="hljs-built_in">this</span>.age = age;
+    }
+}
+</code></pre>
+<p>虽然外部代码不能直接修改<code>private</code>字段，但是，外部代码可以调用方法<code>setName()</code>和<code>setAge()</code>来间接修改<code>private</code>字段。在方法内部，我们就有机会检查参数对不对。比如，<code>setAge()</code>就会检查传入的参数，参数超出了范围，直接报错。这样，外部代码就没有任何机会把<code>age</code>设置成不合理的值。</p>
+<p>对<code>setName()</code>方法同样可以做检查，例如，不允许传入<code>null</code>和空字符串：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">setName</span><span class="hljs-params">(String name)</span> {
+    <span class="hljs-keyword">if</span> (name == <span class="hljs-literal">null</span> || name.isBlank()) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">IllegalArgumentException</span>(<span class="hljs-string">&quot;invalid name&quot;</span>);
+    }
+    <span class="hljs-built_in">this</span>.name = name.strip(); <span class="hljs-comment">// 去掉首尾空格</span>
+}
+</code></pre>
+<p>同样，外部代码不能直接读取<code>private</code>字段，但可以通过<code>getName()</code>和<code>getAge()</code>间接获取<code>private</code>字段的值。</p>
+<p>所以，一个类通过定义方法，就可以给外部代码暴露一些操作的接口，同时，内部自己保证逻辑一致性。</p>
+<p>调用方法的语法是<code>实例变量.方法名(参数);</code>。一个方法调用就是一个语句，所以不要忘了在末尾加<code>;</code>。例如：<code>ming.setName(&quot;Xiao Ming&quot;);</code>。</p>
+<h3>定义方法</h3>
+<p>从上面的代码可以看出，定义方法的语法是：</p>
+<pre class="hljs"><code class="language-java">修饰符 方法返回类型 方法名(方法参数列表) {
+    若干方法语句;
+    <span class="hljs-keyword">return</span> 方法返回值;
+}
+</code></pre>
+<p>方法返回值通过<code>return</code>语句实现，如果没有返回值，返回类型设置为<code>void</code>，可以省略<code>return</code>。</p>
+<h3>private方法</h3>
+<p>有<code>public</code>方法，自然就有<code>private</code>方法。和<code>private</code>字段一样，<code>private</code>方法不允许外部调用，那我们定义<code>private</code>方法有什么用？</p>
+<p>定义<code>private</code>方法的理由是内部方法是可以调用<code>private</code>方法的。例如：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-comment">// private method</span>
+<span class="hljs-keyword">public</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">Main</span> {
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">static</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">main</span><span class="hljs-params">(String[] args)</span> {
+        <span class="hljs-type">Person</span> <span class="hljs-variable">ming</span> <span class="hljs-operator">=</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Person</span>();
+        ming.setBirth(<span class="hljs-number">2008</span>);
+        System.out.println(ming.getAge());
+    }
+}
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">Person</span> {
+    <span class="hljs-keyword">private</span> String name;
+    <span class="hljs-keyword">private</span> <span class="hljs-type">int</span> birth;
+
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">setBirth</span><span class="hljs-params">(<span class="hljs-type">int</span> birth)</span> {
+        <span class="hljs-built_in">this</span>.birth = birth;
+    }
+
+    <span class="hljs-keyword">public</span> <span class="hljs-type">int</span> <span class="hljs-title function_">getAge</span><span class="hljs-params">()</span> {
+        <span class="hljs-keyword">return</span> calcAge(<span class="hljs-number">2019</span>); <span class="hljs-comment">// 调用private方法</span>
+    }
+
+    <span class="hljs-comment">// private方法:</span>
+    <span class="hljs-keyword">private</span> <span class="hljs-type">int</span> <span class="hljs-title function_">calcAge</span><span class="hljs-params">(<span class="hljs-type">int</span> currentYear)</span> {
+        <span class="hljs-keyword">return</span> currentYear - <span class="hljs-built_in">this</span>.birth;
+    }
+}
+</code></pre>
+<p>观察上述代码，<code>calcAge()</code>是一个<code>private</code>方法，外部代码无法调用，但是，内部方法<code>getAge()</code>可以调用它。</p>
+<p>此外，我们还注意到，这个<code>Person</code>类只定义了<code>birth</code>字段，没有定义<code>age</code>字段，获取<code>age</code>时，通过方法<code>getAge()</code>返回的是一个实时计算的值，并非存储在某个字段的值。这说明方法可以封装一个类的对外接口，调用方不需要知道也不关心<code>Person</code>实例在内部到底有没有<code>age</code>字段。</p>
+<h3>this变量</h3>
+<p>在方法内部，可以使用一个隐含的变量<code>this</code>，它始终指向当前实例。因此，通过<code>this.field</code>就可以访问当前实例的字段。</p>
+<p>如果没有命名冲突，可以省略<code>this</code>。例如：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-keyword">class</span> <span class="hljs-title class_">Person</span> {
+    <span class="hljs-keyword">private</span> String name;
+
+    <span class="hljs-keyword">public</span> String <span class="hljs-title function_">getName</span><span class="hljs-params">()</span> {
+        <span class="hljs-keyword">return</span> name; <span class="hljs-comment">// 相当于this.name</span>
+    }
+}
+</code></pre>
+<p>但是，如果有局部变量和字段重名，那么局部变量优先级更高，就必须加上<code>this</code>：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-keyword">class</span> <span class="hljs-title class_">Person</span> {
+    <span class="hljs-keyword">private</span> String name;
+
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">setName</span><span class="hljs-params">(String name)</span> {
+        <span class="hljs-built_in">this</span>.name = name; <span class="hljs-comment">// 前面的this不可少，少了就变成局部变量name了</span>
+    }
+}
+</code></pre>
+<h3>方法参数</h3>
+<p>方法可以包含0个或任意个参数。方法参数用于接收传递给方法的变量值。调用方法时，必须严格按照参数的定义一一传递。例如：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-keyword">class</span> <span class="hljs-title class_">Person</span> {
+    ...
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">setNameAndAge</span><span class="hljs-params">(String name, <span class="hljs-type">int</span> age)</span> {
+        ...
+    }
+}
+</code></pre>
+<p>调用这个<code>setNameAndAge()</code>方法时，必须有两个参数，且第一个参数必须为<code>String</code>，第二个参数必须为<code>int</code>：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-type">Person</span> <span class="hljs-variable">ming</span> <span class="hljs-operator">=</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Person</span>();
+ming.setNameAndAge(<span class="hljs-string">&quot;Xiao Ming&quot;</span>); <span class="hljs-comment">// 编译错误：参数个数不对</span>
+ming.setNameAndAge(<span class="hljs-number">12</span>, <span class="hljs-string">&quot;Xiao Ming&quot;</span>); <span class="hljs-comment">// 编译错误：参数类型不对</span>
+</code></pre>
+<h3>可变参数</h3>
+<p>可变参数用<code>类型...</code>定义，可变参数相当于数组类型：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-keyword">class</span> <span class="hljs-title class_">Group</span> {
+    <span class="hljs-keyword">private</span> String[] names;
+
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">setNames</span><span class="hljs-params">(String... names)</span> {
+        <span class="hljs-built_in">this</span>.names = names;
+    }
+}
+</code></pre>
+<p>上面的<code>setNames()</code>就定义了一个可变参数。调用时，可以这么写：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-type">Group</span> <span class="hljs-variable">g</span> <span class="hljs-operator">=</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Group</span>();
+g.setNames(<span class="hljs-string">&quot;Xiao Ming&quot;</span>, <span class="hljs-string">&quot;Xiao Hong&quot;</span>, <span class="hljs-string">&quot;Xiao Jun&quot;</span>); <span class="hljs-comment">// 传入3个String</span>
+g.setNames(<span class="hljs-string">&quot;Xiao Ming&quot;</span>, <span class="hljs-string">&quot;Xiao Hong&quot;</span>); <span class="hljs-comment">// 传入2个String</span>
+g.setNames(<span class="hljs-string">&quot;Xiao Ming&quot;</span>); <span class="hljs-comment">// 传入1个String</span>
+g.setNames(); <span class="hljs-comment">// 传入0个String</span>
+</code></pre>
+<p>完全可以把可变参数改写为<code>String[]</code>类型：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-keyword">class</span> <span class="hljs-title class_">Group</span> {
+    <span class="hljs-keyword">private</span> String[] names;
+
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">setNames</span><span class="hljs-params">(String[] names)</span> {
+        <span class="hljs-built_in">this</span>.names = names;
+    }
+}
+</code></pre>
+<p>但是，调用方需要自己先构造<code>String[]</code>，比较麻烦。例如：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-type">Group</span> <span class="hljs-variable">g</span> <span class="hljs-operator">=</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Group</span>();
+g.setNames(<span class="hljs-keyword">new</span> <span class="hljs-title class_">String</span>[] {<span class="hljs-string">&quot;Xiao Ming&quot;</span>, <span class="hljs-string">&quot;Xiao Hong&quot;</span>, <span class="hljs-string">&quot;Xiao Jun&quot;</span>}); <span class="hljs-comment">// 传入1个String[]</span>
+</code></pre>
+<p>另一个问题是，调用方可以传入<code>null</code>：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-type">Group</span> <span class="hljs-variable">g</span> <span class="hljs-operator">=</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Group</span>();
+g.setNames(<span class="hljs-literal">null</span>);
+</code></pre>
+<p>而可变参数可以保证无法传入<code>null</code>，因为传入0个参数时，接收到的实际值是一个空数组而不是<code>null</code>。</p>
+<h3>参数绑定</h3>
+<p>调用方把参数传递给实例方法时，调用时传递的值会按参数位置一一绑定。</p>
+<p>那什么是参数绑定？</p>
+<p>我们先观察一个基本类型参数的传递：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-comment">// 基本类型参数绑定</span>
+<span class="hljs-keyword">public</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">Main</span> {
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">static</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">main</span><span class="hljs-params">(String[] args)</span> {
+        <span class="hljs-type">Person</span> <span class="hljs-variable">p</span> <span class="hljs-operator">=</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Person</span>();
+        <span class="hljs-type">int</span> <span class="hljs-variable">n</span> <span class="hljs-operator">=</span> <span class="hljs-number">15</span>; <span class="hljs-comment">// n的值为15</span>
+        p.setAge(n); <span class="hljs-comment">// 传入n的值</span>
+        System.out.println(p.getAge()); <span class="hljs-comment">// 15</span>
+        n = <span class="hljs-number">20</span>; <span class="hljs-comment">// n的值改为20</span>
+        System.out.println(p.getAge()); <span class="hljs-comment">// 15还是20?</span>
+    }
+}
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">Person</span> {
+    <span class="hljs-keyword">private</span> <span class="hljs-type">int</span> age;
+
+    <span class="hljs-keyword">public</span> <span class="hljs-type">int</span> <span class="hljs-title function_">getAge</span><span class="hljs-params">()</span> {
+        <span class="hljs-keyword">return</span> <span class="hljs-built_in">this</span>.age;
+    }
+
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">setAge</span><span class="hljs-params">(<span class="hljs-type">int</span> age)</span> {
+        <span class="hljs-built_in">this</span>.age = age;
+    }
+}
+</code></pre>
+<p>运行代码，从结果可知，修改外部的局部变量<code>n</code>，不影响实例<code>p</code>的<code>age</code>字段，原因是<code>setAge()</code>方法获得的参数，复制了<code>n</code>的值，因此，<code>p.age</code>和局部变量<code>n</code>互不影响。</p>
+<p>结论：基本类型参数的传递，是调用方值的复制。双方各自的后续修改，互不影响。</p>
+<p>我们再看一个传递引用参数的例子：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-comment">// 引用类型参数绑定</span>
+<span class="hljs-keyword">public</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">Main</span> {
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">static</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">main</span><span class="hljs-params">(String[] args)</span> {
+        <span class="hljs-type">Person</span> <span class="hljs-variable">p</span> <span class="hljs-operator">=</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Person</span>();
+        String[] fullname = <span class="hljs-keyword">new</span> <span class="hljs-title class_">String</span>[] { <span class="hljs-string">&quot;Homer&quot;</span>, <span class="hljs-string">&quot;Simpson&quot;</span> };
+        p.setName(fullname); <span class="hljs-comment">// 传入fullname数组</span>
+        System.out.println(p.getName()); <span class="hljs-comment">// &quot;Homer Simpson&quot;</span>
+        fullname[<span class="hljs-number">0</span>] = <span class="hljs-string">&quot;Bart&quot;</span>; <span class="hljs-comment">// fullname数组的第一个元素修改为&quot;Bart&quot;</span>
+        System.out.println(p.getName()); <span class="hljs-comment">// &quot;Homer Simpson&quot;还是&quot;Bart Simpson&quot;?</span>
+    }
+}
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">Person</span> {
+    <span class="hljs-keyword">private</span> String[] name;
+
+    <span class="hljs-keyword">public</span> String <span class="hljs-title function_">getName</span><span class="hljs-params">()</span> {
+        <span class="hljs-keyword">return</span> <span class="hljs-built_in">this</span>.name[<span class="hljs-number">0</span>] + <span class="hljs-string">&quot; &quot;</span> + <span class="hljs-built_in">this</span>.name[<span class="hljs-number">1</span>];
+    }
+
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">setName</span><span class="hljs-params">(String[] name)</span> {
+        <span class="hljs-built_in">this</span>.name = name;
+    }
+}
+</code></pre>
+<p>注意到<code>setName()</code>的参数现在是一个数组。一开始，把<code>fullname</code>数组传进去，然后，修改<code>fullname</code>数组的内容，结果发现，实例<code>p</code>的字段<code>p.name</code>也被修改了！</p>
+<div class="alert alert-note">
+<p><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" /></svg> 结论<span></span></p>
+<p>引用类型参数的传递，调用方的变量，和接收方的参数变量，指向的是同一个对象。双方任意一方对这个对象的修改，都会影响对方（因为指向同一个对象嘛）。
+</p></div>
+<p>有了上面的结论，我们再看一个例子：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-comment">// 引用类型参数绑定</span>
+<span class="hljs-keyword">public</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">Main</span> {
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">static</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">main</span><span class="hljs-params">(String[] args)</span> {
+        <span class="hljs-type">Person</span> <span class="hljs-variable">p</span> <span class="hljs-operator">=</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Person</span>();
+        <span class="hljs-type">String</span> <span class="hljs-variable">bob</span> <span class="hljs-operator">=</span> <span class="hljs-string">&quot;Bob&quot;</span>;
+        p.setName(bob); <span class="hljs-comment">// 传入bob变量</span>
+        System.out.println(p.getName()); <span class="hljs-comment">// &quot;Bob&quot;</span>
+        bob = <span class="hljs-string">&quot;Alice&quot;</span>; <span class="hljs-comment">// bob改名为Alice</span>
+        System.out.println(p.getName()); <span class="hljs-comment">// &quot;Bob&quot;还是&quot;Alice&quot;?</span>
+    }
+}
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">Person</span> {
+    <span class="hljs-keyword">private</span> String name;
+
+    <span class="hljs-keyword">public</span> String <span class="hljs-title function_">getName</span><span class="hljs-params">()</span> {
+        <span class="hljs-keyword">return</span> <span class="hljs-built_in">this</span>.name;
+    }
+
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">setName</span><span class="hljs-params">(String name)</span> {
+        <span class="hljs-built_in">this</span>.name = name;
+    }
+}
+</code></pre>
+<p>不要怀疑引用参数绑定的机制，试解释为什么上面的代码两次输出都是<code>&quot;Bob&quot;</code>。</p>
+<h3>练习</h3>
+<p>给<code>Person</code>类增加<code>getAge</code>/<code>setAge</code>方法：</p>
+<pre class="hljs"><code class="language-java"><span class="hljs-keyword">public</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">Main</span> {
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">static</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">main</span><span class="hljs-params">(String[] args)</span> {
+        <span class="hljs-type">Person</span> <span class="hljs-variable">ming</span> <span class="hljs-operator">=</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Person</span>();
+        ming.setName(<span class="hljs-string">&quot;小明&quot;</span>);
+        ming.setAge(<span class="hljs-number">12</span>);
+        System.out.println(ming.getAge());
+    }
+}
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">Person</span> {
+    <span class="hljs-keyword">private</span> String name;
+
+    <span class="hljs-keyword">public</span> String <span class="hljs-title function_">getName</span><span class="hljs-params">()</span> {
+        <span class="hljs-keyword">return</span> name;
+    }
+
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">setName</span><span class="hljs-params">(String name)</span> {
+        <span class="hljs-built_in">this</span>.name = name;
+    }
+}
+</code></pre>
+<p><a href="oop-method.zip">下载练习</a></p>
+<h3>小结</h3>
+<ul>
+<li>
+<p>方法可以让外部代码安全地访问实例字段；</p>
+</li>
+<li>
+<p>方法是一组执行语句，并且可以执行任意逻辑；</p>
+</li>
+<li>
+<p>方法内部遇到return时返回，void表示不返回任何值（注意和返回null不同）；</p>
+</li>
+<li>
+<p>外部代码通过public方法操作实例，内部代码可以调用private方法；</p>
+</li>
+<li>
+<p>理解方法的参数绑定。</p>
+</li>
+</ul>
+
+    </div>
+
+
+
+
+
+
+    <hr class="gsc-border">
+    <div id="gsi-chapter-prev-next" class="flex flex-row mt-4">
+        <div id="gsi-chapter-prev" class="basis-1/2 mr-2 text-left">
+
+            <a href="/books/java/oop/basic/index.html"
+                onclick="gs_load_chapter('/books/java/oop/basic/index.html',true);return false;"
+                class="inline-block my-2">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M18.75 19.5l-7.5-7.5 7.5-7.5m-6 15L5.25 12l7.5-7.5" />
+                </svg>
+                面向对象基础
+            </a>
+
+        </div>
+        <div id="gsi-chapter-next" class="basis-1/2 ml-2 text-right">
+
+            <a href="/books/java/oop/basic/constructor/index.html"
+                onclick="gs_load_chapter('/books/java/oop/basic/constructor/index.html',true);return false;"
+                class="inline-block my-2">
+                构造方法
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M11.25 4.5l7.5 7.5-7.5 7.5m-6-15l7.5 7.5-7.5 7.5" />
+                </svg>
+            </a>
+
+        </div>
+    </div>
+</div>
+
+
+<!-- oauth comment -->
+
+<hr class="gsc-border mt-4">
+<div class="mb-4"></div>
+<style>
+    div.comment-item {
+        display: flex;
+        max-width: 100%;
+        padding-bottom: 16px;
+    }
+
+    div.comment-item>div.comment-avatar {
+        flex-shrink: 0;
+        padding-right: 16px;
+    }
+
+    div.comment-item>div.comment-avatar>img {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+    }
+
+    div.comment-item>div.comment-content {
+        flex-grow: 1;
+        overflow: auto;
+    }
+</style>
+<script src="/static/markdown-it.min.js"></script>
+<script>
+    if (window.gitsite_comment === undefined) {
+        (function () {
+            const MAX_COMMENT_HEIGHT = 400;
+            // begin function
+            function _comment_set_token(token, user, expires) {
+                localStorage.setItem('_comment_token_', token);
+                localStorage.setItem('_comment_user_', JSON.stringify(user));
+                localStorage.setItem('_comment_expires_', expires.toString());
+            }
+
+            function _comment_get_user() {
+                const expires = parseInt(localStorage.getItem('_comment_expires_') || '0');
+                if (Date.now() > expires) {
+                    return null;
+                }
+                return JSON.parse(localStorage.getItem('_comment_user_'));
+            }
+
+            function _comment_get_token() {
+                const expires = parseInt(localStorage.getItem('_comment_expires_') || '0');
+                if (Date.now() > expires) {
+                    return null;
+                }
+                return localStorage.getItem('_comment_token_');
+            }
+
+            function _comment_markdown_render(text, autoCollapse = true) {
+                const md = markdownit();
+                const defaultRender = md.renderer.rules.link_open || function (tokens, idx, options, env, self) {
+                    return self.renderToken(tokens, idx, options);
+                };
+                md.renderer.rules.link_open = function (tokens, idx, options, env, self) {
+                    // Add a new `target` attribute, or replace the value of the existing one.
+                    tokens[idx].attrSet('target', '_blank');
+                    tokens[idx].attrSet('rel', 'nofollow');
+                    // Pass the token to the default renderer.
+                    return defaultRender(tokens, idx, options, env, self);
+                };
+                if (autoCollapse) {
+                    return '<div class="x-auto-collapse">' + md.render(text) + '</div>';
+                }
+                return md.render(text);
+            }
+
+            function _comment_remove(btn, msg) {
+                if (!confirm(msg)) {
+                    return;
+                }
+                const item = _comment_find_parent(btn, 'comment-item');
+                const type = item.getAttribute('type');
+                const id = item.getAttribute('id');
+                const token = _comment_get_token();
+                let path = null;
+                let data = {};
+                if (type === 'comment') {
+                    path = '/api/comments';
+                    data.commentId = id;
+                } else if (type === 'reply') {
+                    path = '/api/replies';
+                    data.replyId = id;
+                } else {
+                    throw 'invalid type';
+                }
+                btn.style.display = 'none';
+                fetch('https://api.liaoxuefeng.com' + path, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': 'Bearer: ' + token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                }).then(resp => {
+                    console.log('delete ok.');
+                    _comment_start_load(true);
+                }).catch(err => {
+                    console.error(err);
+                });
+            }
+
+            function _comment_post(btn) {
+                const form = _comment_find_parent(btn, 'comment-form');
+                const err = form.querySelector('span.comment-post-error');
+                const token = _comment_get_token();
+                if (!token) {
+                    err.innerHTML = 'Please sign in first.';
+                    return;
+                }
+                const textarea = form.querySelector('textarea');
+                const content = textarea.value.trim();
+                if (content === '') {
+                    err.innerHTML = 'content is empty.';
+                    return;
+                }
+                const type = form.getAttribute('type');
+                const id = form.getAttribute('id');
+                let data = {
+                    content: content
+                };
+                let path = null;
+                if (type === 'comment') {
+                    data.pageUrl = id;
+                    path = '/api/comments';
+                } else if (type === 'reply') {
+                    data.commentId = id;
+                    path = '/api/replies';
+                } else {
+                    err.innerHTML = 'invalid type.';
+                    return;
+                }
+                console.log(data);
+                err.innerHTML = '';
+                btn.disabled = true;
+
+                fetch('https://api.liaoxuefeng.com' + path, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer: ' + token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                }).then(resp => {
+                    resp.json().then(obj => {
+                        if (obj.error) {
+                            console.error(obj.error, obj.message);
+                            err.innerHTML = (obj.message || obj.error).toString();
+                        } else {
+                            console.log('post comment ok.');
+                            textarea.value = '';
+                            _comment_start_load(true);
+                        }
+                    });
+                }).catch(err => {
+                    console.error(err);
+                    err.innerHTML = err.toString();
+                }).finally(() => {
+                    btn.disabled = false;
+                });
+            }
+
+            function _comment_has_class(dom, className) {
+                for (let i = 0; i < dom.classList.length; i++) {
+                    if (dom.classList[i] === className) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            function _comment_find_parent(dom, className) {
+                while (!_comment_has_class(dom, className)) {
+                    dom = dom.parentElement;
+                }
+                return dom;
+            }
+
+            function _comment_start_reply(dom) {
+                const actions = _comment_find_parent(dom, 'comment-action');
+                const item = _comment_find_parent(dom, 'comment-item');
+                const form = item.querySelector('div.comment-form');
+                actions.style.display = 'none';
+                form.style.display = 'block';
+            }
+
+            function _comment_start_write(dom) {
+                const form = _comment_find_parent(dom, 'comment-form');
+                form.querySelector('div.comment-toolbar span.comment-write').style.display = 'inline';
+                form.querySelector('div.comment-toolbar a.comment-write').style.display = 'none';
+                form.querySelector('div.comment-toolbar span.comment-preview').style.display = 'none';
+                form.querySelector('div.comment-toolbar a.comment-preview').style.display = 'inline';
+                form.querySelectorAll('div.comment-toolbar a.comment-button').forEach(a => a.style.display = 'inline');
+                form.querySelector('div.comment-form-edit').style.display = 'block';
+                form.querySelector('div.comment-form-preview').style.display = 'none';
+            }
+
+            function _comment_start_preview(dom) {
+                const form = _comment_find_parent(dom, 'comment-form');
+                form.querySelector('div.comment-toolbar span.comment-write').style.display = 'none';
+                form.querySelector('div.comment-toolbar a.comment-write').style.display = 'inline';
+                form.querySelector('div.comment-toolbar span.comment-preview').style.display = 'inline';
+                form.querySelector('div.comment-toolbar a.comment-preview').style.display = 'none';
+                form.querySelectorAll('div.comment-toolbar a.comment-button').forEach(a => a.style.display = 'none');
+                form.querySelector('div.comment-form-edit').style.display = 'none';
+                const preview = form.querySelector('div.comment-form-preview');
+                const text = form.querySelector('textarea').value.trim() || '(empty)';
+                preview.innerHTML = _comment_markdown_render(text, false);
+                preview.style.display = 'block';
+            }
+
+            function _comment_edit(dom, command) {
+                const form = _comment_find_parent(dom, 'comment-form');
+                let insert = '';
+                switch (command) {
+                    case 'link':
+                        insert = '[link](https://example.com/)'
+                        break;
+                    case 'code':
+                        insert = '\n\n```\npaste code here...\n```\n\n';
+                        break;
+                    case 'ol':
+                        insert = '\n\n- item 1\n- item 2\n- item 3\n\n';
+                        break;
+                    case 'ul':
+                        insert = '\n\n1. item 1\n2. item 2\n3. item 3\n\n';
+                        break;
+                }
+                if (insert) {
+                    const textarea = form.querySelector('textarea');
+                    const position = textarea.selectionStart;
+                    const value = textarea.value;
+                    // Get the text before and after the cursor position
+                    const before = value.substring(0, position);
+                    const after = value.substring(position, value.length);
+
+                    // Insert the new text at the cursor position
+                    textarea.value = before + insert + after;
+
+                    // Set the cursor position to after the newly inserted text
+                    textarea.selectionStart = textarea.selectionEnd = position + insert.length;
+                    textarea.focus();
+                }
+            }
+
+            function _comment_render_template(str, obj) {
+                const keys = Object.keys(obj);
+                for (let key of keys) {
+                    let value = obj[key];
+                    str = str.replaceAll(new RegExp('\\$\\{' + key + '\\}', 'g'), value);
+                }
+                return str;
+            }
+
+            function _comment_loaded(commentThread, result, scroll) {
+                console.log('comments loaded ok.');
+                const itemTempl = document.getElementById('comment-item').innerHTML;
+                const formTempl = document.getElementById('comment-form').innerHTML;
+                const me = _comment_get_user();
+                console.log(result);
+                const action_delete_comment = '<a href="#0" onclick="gitsite_comment.remove(this, \'Confirm delete this comment?\')">Delete</a>';
+                const action_delete_reply = '<a href="#0" onclick="gitsite_comment.remove(this, \'Confirm delete this reply?\')">Delete</a>';
+                let comment_doms = result.comments.map(comment => {
+                    const action_reply = '<div class="comment-action pt-4 border-t gsc-border"><a href="#0" onclick="gitsite_comment.reply(this)">Reply</a></div>';
+                    const can_delete_comment = me !== null && (me.role === 1000 || me.id === comment.user_id);
+                    let model = {
+                        type: 'comment',
+                        id: comment.id,
+                        user_image: comment.user_image,
+                        user_name: gitsite.encodeHtml(comment.user_name),
+                        created_at: new Date(comment.created_at).toLocaleString(),
+                        content: _comment_markdown_render(comment.content),
+                        comment_reply_form: '',
+                        comment_action: me === null ? '' : action_reply,
+                        delete_action: can_delete_comment ? action_delete_comment : ''
+                    }
+                    let reply_doms = comment.replies.map(reply => {
+                        const can_delete_reply = me !== null && (me.role === 1000 || me.id === reply.user_id);
+                        let replyModel = {
+                            type: 'reply',
+                            id: reply.id,
+                            user_image: reply.user_image,
+                            user_name: gitsite.encodeHtml(reply.user_name),
+                            created_at: new Date(reply.created_at).toLocaleString(),
+                            content: _comment_markdown_render(reply.content),
+                            comment_reply_form: '',
+                            comment_replies: '',
+                            comment_action: '',
+                            delete_action: can_delete_reply ? action_delete_reply : ''
+                        };
+                        return _comment_render_template(itemTempl, replyModel);
+                    });
+                    model.comment_replies = reply_doms.join('');
+                    // set comment_reply_form:
+                    if (me !== null) {
+                        model.comment_reply_form = _comment_render_template(formTempl, {
+                            type: 'reply',
+                            id: comment.id,
+                            style: 'display:none',
+                            user_name: me.name,
+                            user_image: me.image
+                        });
+                    }
+                    return _comment_render_template(itemTempl, model);
+                });
+                let html = comment_doms.join('');
+                if (me !== null) {
+                    let comment_form = _comment_render_template(formTempl, {
+                        type: 'comment',
+                        id: location.href,
+                        style: '',
+                        user_name: me.name,
+                        user_image: me.image
+                    });
+                    html = html + comment_form;
+                }
+                commentThread.querySelector('div.comment-loading').style.display = 'none';
+                commentThread.querySelector('div.comment-topics').innerHTML = html;
+                commentThread.querySelectorAll('div.comment-topics div.x-auto-collapse').forEach(div => {
+                    if (div.scrollHeight <= MAX_COMMENT_HEIGHT + 60) {
+                        return;
+                    }
+                    div.style.maxHeight = MAX_COMMENT_HEIGHT + 'px';
+                    div.style.overflow = 'hidden';
+                    let p = document.createElement('p');
+                    p.innerHTML = '<a href="#0" class="x-read-more">Read More ▼</a><a href="#0" class="x-collapse" style="display:none">Collapse ▲</a>';
+                    div.parentNode.appendChild(p);
+                    const aReadMore = p.querySelector('a.x-read-more');
+                    const aCollapse = p.querySelector('a.x-collapse');
+                    aReadMore.onclick = () => {
+                        div.style.maxHeight = null;
+                        div.style.overflow = null;
+                        aReadMore.style.display = 'none';
+                        aCollapse.style.display = null;
+                    };
+                    aCollapse.onclick = () => {
+                        div.style.maxHeight = MAX_COMMENT_HEIGHT + 'px';
+                        div.style.overflow = 'hidden';
+                        aReadMore.style.display = null;
+                        aCollapse.style.display = 'none';
+                        div.parentNode.parentNode.scrollIntoView();
+                    };
+                });
+                if (scroll) {
+                    commentThread.scrollIntoView();
+                }
+            }
+
+            function _comment_start_load(scroll = false) {
+                const commentThread = document.getElementById('comment-thread');
+                if (!commentThread) {
+                    return;
+                }
+                console.log(`start loading comments: ${location.href}`);
+                const version = Date.now().toString();
+                commentThread.setAttribute('init', version);
+                commentThread.querySelector('div.comment-topics').innerHTML = '';
+                // show loading:
+                commentThread.querySelector('div.comment-loading').style.display = 'block';
+                // hide info:
+                commentThread.querySelector('div.comment-info-failed').style.display = 'none';
+                commentThread.querySelector('div.comment-info-loaded').style.display = 'none';
+                fetch('https://api.liaoxuefeng.com/api/comments?url=' + encodeURIComponent(location.href))
+                    .then(resp => {
+                        resp.json().then(result => {
+                            const commentThread2 = document.getElementById('comment-thread');
+                            if (!commentThread2) {
+                                return;
+                            }
+                            if (commentThread2.getAttribute('init') !== version) {
+                                // dom changed:
+                                console.warn('skip load expired comments.');
+                                return;
+                            }
+                            // show info:
+                            const user = _comment_get_user();
+                            if (user === null) {
+                                // show signin:
+                                commentThread2.querySelector('span.comment-signin-state').style.display = 'none';
+                                commentThread2.querySelector('span.comment-signout-state').style.display = 'inline';
+                            } else {
+                                // show signout:
+                                commentThread2.querySelector('span.comment-signin-state').style.display = 'inline';
+                                commentThread2.querySelector('span.comment-signout-state').style.display = 'none';
+                                commentThread2.querySelector('span.comment-user-name').innerHTML = gitsite.encodeHtml(user.name);
+                            }
+                            commentThread2.querySelector('div.comment-info-loaded').style.display = 'block';
+                            _comment_loaded(commentThread2, result, scroll);
+                        });
+                    }).catch(err => {
+                        commentThread.querySelector('div.comment-info-failed').style.display = 'block';
+                    }).finally(() => {
+                        // hide loading:
+                        commentThread.querySelector('div.comment-loading').style.display = 'none';
+                    });
+            }
+
+            function _comment_oauth_signout() {
+                _comment_set_token('', '', 0);
+                _comment_start_load();
+            }
+
+            function _comment_oauth_signin() {
+                const origin = new URL('https://api.liaoxuefeng.com').origin;
+                let
+                    pw = 700,
+                    ph = 420,
+                    ww = window.outerWidth,
+                    wh = window.outerHeight,
+                    wl = window.screenLeft,
+                    wt = window.screenTop,
+                    pl = parseInt(wl + (ww - pw) / 2),
+                    pt = parseInt(wt + (wh - ph) / 2);
+                if (window.__oauth_popup_callback__ === undefined) {
+                    window.__oauth_popup_callback__ = true;
+                    window.addEventListener('message', (event) => {
+                        console.log('message from: ' + event.origin + ': ', event.data);
+                        if (event.origin === origin) {
+                            let oauthResult = event.data;
+                            console.log(oauthResult);
+                            if (oauthResult.success) {
+                                _comment_set_token(oauthResult.token, oauthResult.user, oauthResult.expires);
+                            }
+                            if (window.__oauth_popup__) {
+                                window.__oauth_popup__.close();
+                                window.__oauth_popup__ = null;
+                            }
+                            _comment_start_load();
+                        }
+                    });
+                }
+
+                window.__oauth_popup__ = window.open('https://api.liaoxuefeng.com/oauth_request', '__oauth_popup__', `popup=true,left=${pl},top=${pt},width=${pw},height=${ph}`);
+                window.__oauth_popup__.focus();
+            }
+
+            const fnOnScroll = () => {
+                const commentThread = document.getElementById('comment-thread');
+                if (!commentThread || commentThread.getAttribute('init') !== null) {
+                    return;
+                }
+                let winHeight = window.innerHeight;
+                let winOffsetY = window.scrollY;
+                let domTop = commentThread.offsetTop;
+                if (winHeight + winOffsetY + 20 > domTop) {
+                    _comment_start_load();
+                }
+            };
+
+            documentReady(() => {
+                window.addEventListener('scroll', fnOnScroll);
+                gitsite.addContentChangedListener(fnOnScroll);
+                fnOnScroll();
+            });
+
+            window.gitsite_comment = {
+                load: _comment_start_load,
+                signin: _comment_oauth_signin,
+                signout: _comment_oauth_signout,
+                reply: _comment_start_reply,
+                write: _comment_start_write,
+                preview: _comment_start_preview,
+                edit: _comment_edit,
+                post: _comment_post,
+                remove: _comment_remove
+            };
+
+            // end function
+        })();
+    }
+</script>
+
+<template id="comment-item">
+    <div class="comment-item border-t gsc-border pt-4" type="${type}" id="${id}">
+        <div class="comment-avatar">
+            <img class="border gsc-border" src="${user_image}">
+        </div>
+        <div class="comment-content">
+            <div>
+                <span class="comment-content-info">${user_name} @ ${created_at} ${delete_action}</span>
+            </div>
+            <div class="comment-content-text">${content}</div>
+            ${comment_replies}
+            ${comment_action}
+            ${comment_reply_form}
+        </div>
+    </div>
+</template>
+
+<template id="comment-form">
+    <div class="comment-form border-t gsc-border pt-4" type="${type}" id="${id}" style="${style}">
+        <div class="comment-item">
+            <div class="comment-avatar comment-current-user">
+                <img class="border gsc-border" src="${user_image}">
+            </div>
+            <div class="comment-content">
+                <div class="comment-toolbar">
+                    <span class="comment-write me-4">Write</span>
+                    <a href="#0" onclick="gitsite_comment.write(this)" class="comment-write me-4"
+                        style="display:none">Write</a>
+                    <span class="comment-preview me-4" style="display:none">Preview</span>
+                    <a href="#0" onclick="gitsite_comment.preview(this)" class="comment-preview me-4">Preview</a>
+                    <a href="#0" onclick="gitsite_comment.edit(this,'link')" class="comment-button me-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                            class="bi bi-link-45deg" viewBox="0 0 16 16">
+                            <path
+                                d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1 1 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4 4 0 0 1-.128-1.287z" />
+                            <path
+                                d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243z" />
+                        </svg>
+                    </a>
+                    <a href="#0" onclick="gitsite_comment.edit(this,'code')" class="comment-button me-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                            class="bi bi-code-slash" viewBox="0 0 16 16">
+                            <path
+                                d="M10.478 1.647a.5.5 0 1 0-.956-.294l-4 13a.5.5 0 0 0 .956.294zM4.854 4.146a.5.5 0 0 1 0 .708L1.707 8l3.147 3.146a.5.5 0 0 1-.708.708l-3.5-3.5a.5.5 0 0 1 0-.708l3.5-3.5a.5.5 0 0 1 .708 0m6.292 0a.5.5 0 0 0 0 .708L14.293 8l-3.147 3.146a.5.5 0 0 0 .708.708l3.5-3.5a.5.5 0 0 0 0-.708l-3.5-3.5a.5.5 0 0 0-.708 0" />
+                        </svg>
+                    </a>
+                    <a href="#0" onclick="gitsite_comment.edit(this,'ol')" class="comment-button me-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                            class="bi bi-list-ol" viewBox="0 0 16 16">
+                            <path fill-rule="evenodd"
+                                d="M5 11.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5" />
+                            <path
+                                d="M1.713 11.865v-.474H2c.217 0 .363-.137.363-.317 0-.185-.158-.31-.361-.31-.223 0-.367.152-.373.31h-.59c.016-.467.373-.787.986-.787.588-.002.954.291.957.703a.595.595 0 0 1-.492.594v.033a.615.615 0 0 1 .569.631c.003.533-.502.8-1.051.8-.656 0-1-.37-1.008-.794h.582c.008.178.186.306.422.309.254 0 .424-.145.422-.35-.002-.195-.155-.348-.414-.348h-.3zm-.004-4.699h-.604v-.035c0-.408.295-.844.958-.844.583 0 .96.326.96.756 0 .389-.257.617-.476.848l-.537.572v.03h1.054V9H1.143v-.395l.957-.99c.138-.142.293-.304.293-.508 0-.18-.147-.32-.342-.32a.33.33 0 0 0-.342.338zM2.564 5h-.635V2.924h-.031l-.598.42v-.567l.629-.443h.635z" />
+                        </svg>
+                    </a>
+                    <a href="#0" onclick="gitsite_comment.edit(this,'ul')" class="comment-button me-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                            class="bi bi-list-ul" viewBox="0 0 16 16">
+                            <path fill-rule="evenodd"
+                                d="M5 11.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m-3 1a1 1 0 1 0 0-2 1 1 0 0 0 0 2m0 4a1 1 0 1 0 0-2 1 1 0 0 0 0 2m0 4a1 1 0 1 0 0-2 1 1 0 0 0 0 2" />
+                        </svg>
+                    </a>
+                </div>
+                <div class="comment-form-edit">
+                    <textarea style="width:100%" rows="10" name="comment"
+                        placeholder="Write your comment using Markdown format..."></textarea>
+                </div>
+                <div class="comment-form-preview my-2 border-t border-b gsc-border" style="display:none"></div>
+                <div>
+                    <button type="button" onclick="gitsite_comment.post(this)">Post</button>
+                    <span class="comment-post-error"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<div id="comment-thread">
+    <h3>Comments</h3>
+    <div class="comment-loading my-4">
+        <svg class="animate-spin mr-2 h-5 w-5" style="display:inline" xmlns="http://www.w3.org/2000/svg" fill="none"
+            viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+            </path>
+        </svg>
+        Loading comments...
+    </div>
+    <div class="comment-info-failed my-4" style="display:none">Fail to load comments. Try
+        <a href="#0" onclick="gitsite_comment.load()">reload</a>.
+    </div>
+    <div class="comment-info-loaded my-4" style="display:none">Comments loaded.
+        <span class="comment-signout-state" style="display:none">To post a comment, please
+            <a href="#0" onclick="gitsite_comment.signin()">Sign In</a></span>
+        <span class="comment-signin-state" style="display:none">Hello, <span
+                class="comment-user-name font-semibold"></span>.
+            <a href="#0" onclick="gitsite_comment.signout()">Sign Out</a></span>
+    </div>
+    <div class="comment-topics">
+    </div>
+</div>
+
+<!--// oauth comment -->
+
+<!--// book content -->

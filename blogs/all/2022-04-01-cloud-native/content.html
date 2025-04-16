@@ -1,0 +1,742 @@
+<!-- blog content -->
+<div id="gsi-blog-title">
+    <h1>从云计算到云原生：从概念到落地</h1>
+</div>
+<div id="gsi-blog-info" class="my-2">
+    <svg xmlns="http://www.w3.org/2000/svg" class="gsc-icon" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+        stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round"
+            d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5m-9-6h.008v.008H12v-.008ZM12 15h.008v.008H12V15Zm0 2.25h.008v.008H12v-.008ZM9.75 15h.008v.008H9.75V15Zm0 2.25h.008v.008H9.75v-.008ZM7.5 15h.008v.008H7.5V15Zm0 2.25h.008v.008H7.5v-.008Zm6.75-4.5h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V15Zm0 2.25h.008v.008h-.008v-.008Zm2.25-4.5h.008v.008H16.5v-.008Zm0 2.25h.008v.008H16.5V15Z" />
+    </svg>
+
+    <time datetime="2022-04-01"></time>
+</div>
+<div id="gsi-blog-content">
+    <p>../../books/git/BEFORE.md</p>
+<p>云计算最近几年已经火得不行，云原生（Cloud Native）这个概念又来了，如果上云不“原生”，那就等于白上云。究竟什么是云原生？云原生有何优势？怎么从“不原生”一步一步做到云原生？本文将给出切实可行的云原生落地指南。</p>
+<p>我们先从云计算说起。在云计算普及之前，一个应用想要发布到互联网，就需要企业自己先买几台服务器，找一个IDC机房，租几个机架，把服务器放进去。接下来就是装Linux系统，部署应用。我们就假定用Java写了Web应用，怎么部署上去呢？先配置Tomcat服务器，在把编译好的war包上传到服务器，有用FTP的，安全意识高一点的会选SCP，然后配置Nginx、MySQL这些服务，最后一通调试，把应用跑起来，就算齐活。</p>
+<p>这种物理机配合自搭网络环境、自搭Linux、自配环境的方式，有很多缺点，但最主要的问题有这么几个：</p>
+<ol>
+<li>扩容和维护难，因为是物理机，需要先采购后跑机房，遇到双十一业务量猛增是来不及扩容的，用行话讲就是计算资源缺乏弹性；</li>
+<li>安全性太差，熟悉Linux的运维工程师本来就少，精通SELinux的更是凤毛麟角，而且，系统安全性仅仅是一个方面，应用部署的权限、流程造成的安全漏洞更大；</li>
+<li>部署流程不规范，开发、测试和运维脱节，缺少自动化测试和部署，无法快速迭代业务。</li>
+</ol>
+<p>解决方案是上云。上云不能解决所有问题，但部分解决了前两个问题：</p>
+<ol>
+<li>云服务商提供的是虚拟机，比起物理机，虚拟机的创建、维护、销毁比物理机简单了太多，且随时可以扩容，很大程度上解决了“弹性计算”的问题，至于弹性程度有多大，还得看应用的架构和设计水平；</li>
+<li>和绝大多数中小企业相比，云服务商在网络和服务器安全方面要强若干个数量级。只要选择合适的官方镜像，配合防火墙规则，系统级别的安全问题大大减少，可以将重点放到应用本身的安全性上。</li>
+</ol>
+<p>但是如果仅仅满足上云，把物理机换成虚拟机，把物理网换成虚拟专用网（VPC），是远远不够的。这些是计算资源和网络资源层面的简化。应用方面，如果延续旧的一套开发、测试、部署流程，做不到快速迭代。</p>
+<p>要做到快速迭代，敏捷开发，就需要DevOps，即开发运维由一个团队负责，开发阶段，就要把部署、运维的工作考虑进去，而不是发布一个war包或者jar包后扔给运维不管了。</p>
+<p>重开发、轻部署，直接后果就是缺少自动化发布流程。想要把部署规范化，就需要整体考虑一系列问题。</p>
+<p>还是以Java应用为例，如果是手动部署，那么就上传war包到服务器，覆盖原有的版本，重启Tomcat，再测试。如果发现有严重问题要回滚怎么办？把老版本再传一遍，然后重启Tomcat。</p>
+<p>手动部署，每次部署都是一次生死考验，所以最好不要安排在半夜，以免手抖敲错了命令，本来中断10分钟的服务，变成了灾备恢复，中断3天。</p>
+<p>稍微靠谱一点的是写脚本部署，但各家写出来的脚本都有各家特色，不通用，不易维护，所以更好的方式是用成熟的部署方案，比如Ansible，把脚本标准化，比如做成蓝绿发布，把服务器分组，比如A、B两组，先把流量切到B组，升级A组服务器，有问题就回滚，没问题了，再把流量切到A组，升级B组服务器，最后，恢复正常流量，整个部署完成。</p>
+<p>但是回滚这个事情，远没有那么简单。做过开发的同学都知道，升级新版本，一般要加配置，改配置，如果回滚到旧版本，忘了把配置改回去，那旧版本可能也不能正常工作。</p>
+<p>上云，除了物理变虚拟，简化运维外，最重要的特点——弹性计算，一定要充分利用。</p>
+<p>理论指导实践，实践完善理论。如果我们分析大多数基于互联网的应用，可以看到，一个应用，通常用到的资源如下：</p>
+<ol>
+<li>存储资源，通常对应着一个或多个数据库，例如MySQL、Oracle、PostgreSQL等；</li>
+<li>计算资源，以Java应用为例，就是一个或多个Web应用，跑在Tomcat，或者通过SpringBoot自带嵌入式服务器；</li>
+<li>网关，通常是Nginx之类的服务器，对外作为统一的服务入口，对内提供反向代理；</li>
+<li>其他支撑业务的组件，例如，为提升应用性能采用的Redis集群作为缓存，应用内部各组件通信使用的消息系统如Kafka等，以及随着业务不断扩大增加的ES集群、日志分析和处理的集群等。</li>
+</ol>
+<p>上云后，云服务商通常都提供托管的数据库，以及大规模存储系统（S3），可解决存储资源问题。通过云服务商提供的负载均衡（Load Balancer），也无需自行部署Nginx等网关，免去了运维的问题。各种标准的业务组件如Redis、Kafka等，均可直接租用云服务商提供的资源。</p>
+<p>我们重点讨论计算资源，也就是云上的虚拟机资源。对于应用来说，可以设计成有状态和无状态两种。一个应用在一台虚拟机内跑着，如果有本地文件的修改，它就是有状态的。有状态的应用既不利于扩展，也不利于部署。反过来，如果一个应用在运行期数据总是存在数据库或者缓存集群，本地文件无任何修改，它就是无状态的。</p>
+<p>无状态的应用对应的虚拟机实际上就是不变的计算资源。这里的“不变”非常重要，它是指，一台虚拟机通过一个固定的镜像（预先内置好必要的支持环境，如JRE等）启动后，部署一个应用（对应一个war包或者jar包），该虚拟机状态就不再变化了，直接运行到销毁。</p>
+<p>有的同学会问：如果给这台虚拟机重新部署一个新的应用版本，它的状态不就发生了变化？</p>
+<p>确实如此。为了确保虚拟机的不变性，一旦启动后部署了某个版本，就不允许再重新部署。这样一来，对虚拟机这种计算资源来说，就具有了不变性。不变性意味着某个虚拟机上的应用版本是确定的，与之打包的配置文件是确定的，不存在今天是版本1，明天变成版本2，后天回滚到版本1的情况。</p>
+<p>计算资源不变，能确保启动一台虚拟机，对应发布的应用版本和配置是确定的且不变的，对于运维、排错非常重要。</p>
+<p>那么如何在保持计算资源不变的前提下发布新版本？</p>
+<p>我们以AWS的CodeDeploy服务为例，假设一组正在运行的某应用v1集群包含3台虚拟机：</p>
+<pre class="ascii"><code>   ┌─────────────────────────────────────┐
+   │                 VPC                 │
+   │           ┌────────────────────────┐│
+   │           │      Target Group      ││
+┌──┴──┐        │┌──────┐┌──────┐┌──────┐││
+│ ELB │───────▶││EC2:v1││EC2:v1││EC2:v1│││
+└──┬──┘        │└──────┘└──────┘└──────┘││
+   │           └────────────────────────┘│
+   └─────────────────────────────────────┘
+</code></pre>
+<p>现在，我们要把应用从v1升级到v2，绝不能直接把现有的3台虚拟机的应用直接升级，而是由CodeDeploy服务启动3台新的一模一样的虚拟机，只是部署的应用是v2。现在，一共有6台虚拟机，其中3台运行v1版本，另外3台运行v2版本，但此刻负载均衡控制的网络流量仍然导向v1集群，用户感受不到任何变化：</p>
+<pre class="ascii"><code>   ┌─────────────────────────────────────┐
+   │                 VPC                 │
+   │           ┌────────────────────────┐│
+   │           │      Target Group      ││
+┌──┴──┐        │┌──────┐┌──────┐┌──────┐││
+│ ELB │───────▶││EC2:v1││EC2:v1││EC2:v1│││
+└──┬──┘        │└──────┘└──────┘└──────┘││
+   │           └────────────────────────┘│
+   │           ┌────────────────────────┐│
+   │           │      Target Group      ││
+   │           │┌──────┐┌──────┐┌──────┐││
+   │           ││EC2:v2││EC2:v2││EC2:v2│││
+   │           │└──────┘└──────┘└──────┘││
+   │           └────────────────────────┘│
+   └─────────────────────────────────────┘
+</code></pre>
+<p>v2集群部署成功后，做一些自动化冒烟测试和内网测试，如果有问题，直接销毁，相当于本次部署失败，但无需回滚。如果没有问题，通过负载均衡把流量从v1集群切到v2，用户可无感知地直接访问v2版本：</p>
+<pre class="ascii"><code>   ┌─────────────────────────────────────┐
+   │                 VPC                 │
+   │           ┌────────────────────────┐│
+   │           │      Target Group      ││
+┌──┴──┐        │┌──────┐┌──────┐┌──────┐││
+│ ELB │───┐    ││EC2:v1││EC2:v1││EC2:v1│││
+└──┬──┘   │    │└──────┘└──────┘└──────┘││
+   │      │    └────────────────────────┘│
+   │      │    ┌────────────────────────┐│
+   │      │    │      Target Group      ││
+   │      │    │┌──────┐┌──────┐┌──────┐││
+   │      └───▶││EC2:v2││EC2:v2││EC2:v2│││
+   │           │└──────┘└──────┘└──────┘││
+   │           └────────────────────────┘│
+   └─────────────────────────────────────┘
+</code></pre>
+<p>稳定一段时间（例如15分钟）后，销毁v1集群。至此，整个升级完成。</p>
+<p>上述的蓝绿部署就是CodeDeploy的一种标准部署流程。CodeDeploy也支持灰度发布，适用于更大规模的应用。</p>
+<p>把计算资源不可变应用到部署上，实际上是充分利用了弹性计算这个优势，短时间创建和销毁虚拟机，只有上云才能做到，并且针对云计算，把部署流程变得更加简单可靠，每天发几个版本甚至几十、几百个版本都变得可能，DevOps能落地，有点“云原生”的味道了。</p>
+<p>说到AWS的CodeDeploy，最早我使用AWS时，对于它的计费采用Reserved Instance预付模型感到很不理解，租用一台虚拟机，按国内阿里云、腾讯云包年包月预付享折扣不是更直观吗？如果仅仅把上云变成租用虚拟机，那就完全丧失了弹性计算的优势，相当于租用了一台虚拟机在里面自己折腾。AWS的Reserved Instance计费并不绑定某一台虚拟机，而是一种规格的虚拟机。我们还是举例说明，如果我们有1台2v4G规格的虚拟机，并购买了1年的Reserved Instance，那么，我随时可以销毁这台虚拟机，并重新创建一台同样规格的新的虚拟机，Reserved Instance计费会自动匹配到新的虚拟机上，这样才能实现计算资源不变，频繁实施蓝绿部署，真正把部署变成一种云服务。最近阿里云终于推出了节省计划的付费模式，有点真正的云计算的付费味道了，但是腾讯云、华为云还停留在包年包月和按量付费这两种原始租赁模型。</p>
+<p>讲了这么多自动化部署，实际上一个指导思想就是如何充分利用云的弹性计算资源。从充分利用云的弹性资源为出发点，设计一整套开发、部署、测试的流程，就是云原生。弹性资源利用得越充分，云原生的“浓度”就越高，就越容易实施小步快跑的快速迭代。</p>
+<p>那么虚拟机是不是弹性最好的计算资源呢？从应用的角度看，显然容器是一种比虚拟机更具弹性，更加抽象，也更容易部署的计算资源。</p>
+<p>容器和虚拟机相比，它实际上是一种资源隔离的进程，运行在容器中的应用比独占一个虚拟机消耗的资源更少，启动速度更快。此外，容器的镜像包含了完整的运行时环境，部署的时候，无需考虑任何额外的组件，比其他任何部署方式都简单。使用容器，开发部署流程就变成了开发，生成镜像，推送至Docker Hub或云服务商提供的Registry，直接启动容器，整个过程大大简化。</p>
+<p>使用容器比使用CodeDeploy部署还要更加简单，因为CodeDeploy需要在虚拟机镜像中预置Agent，由于没有统一的发布标准，还需要配置CodeDeploy，告诉它去哪拉取最新版本，这又涉及到一系列权限配置。而容器作为标准的部署方案，连发布系统都以Registry对各个镜像版本进行了有效管理，所以部署非常简单。</p>
+<p>容器作为一种弹性计算资源，也应遵循计算不变性，即不要给容器挂载可变的存储卷。一组不变的容器集群才能更容易地升级。容器的运行方式本身就遵循了不变性原则，因为通过一个镜像启动一个容器，在运行过程中，是不可能换一个镜像的。容器本身也强烈不建议应用写入数据到文件系统，因为重启后这些修改将全部丢失。</p>
+<p>容器的启动和销毁非常容易，不过，容器的管理却并不简单。容器的管理涉及到创建、调度、弹性扩容、负载均衡、故障检测等等，Kubernetes作为事实上的容器编排标准平台，已经成为各个云服务商的标配。</p>
+<p>如果要直接使用K8s，在云环境中首先要有一组虚拟机资源作为底层资源，然后搭建K8s环境，定义好容器编排并启动容器。云服务商几乎都提供托管的K8s服务，但直接管理K8s仍然需要非常熟悉K8s的工程师。</p>
+<p>还有一种更简单的使用容器的方式，即完全将底层虚拟机和K8s托管给云服务商，企业客户只需关心如何部署容器，底层的K8s和虚拟机对企业不可见或者无需关心。AWS的Elastic Container和阿里云的弹性容器均为此类服务。对于中小规模的应用来说，计算资源直接使用容器，再配合云服务商提供的负载均衡，托管的数据库、消息系统、日志系统等组件服务，应该是目前最“云原生”的一种方案。</p>
+<p>最后，我们总结一下云原生的特点：</p>
+<p>所谓云原生，就是在上云的过程中，充分发挥云平台的弹性计算、弹性存储的优势，尽量把应用设计成适合云计算的架构，把部署设计成简单易用的流程，这样才能实现业务快速上线，快速迭代。</p>
+<p>云原生是一个大方向，在上云的过程中，逐步改造应用架构和部署流程，从手动往自动转，逐步增加计算资源的弹性，就能把云原生一步步落地。</p>
+
+</div>
+<script>
+    (() => {
+        let dom = document.querySelector('#gsi-blog-info time');
+        dom.innerHTML = new Date(dom.getAttribute('datetime')).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+    })();
+</script>
+
+
+
+
+
+
+<hr class="gsc-border">
+
+<div id="gsi-blog-prev-next" class="flex flex-row mt-4">
+    <div id="gsi-blog-prev" class="basis-1/2 text-left">
+
+        <a href="/blogs/all/2022-05-23-wallet-security/index.html"
+            onclick="gs_load_blog('/blogs/all/2022-05-23-wallet-security/index.html',true);return false;"
+            class="inline-block my-2">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M18.75 19.5l-7.5-7.5 7.5-7.5m-6 15L5.25 12l7.5-7.5" />
+            </svg>
+            区块链钱包安全指南
+        </a>
+
+    </div>
+    <div id="gsi-blog-next" class="basis-1/2 text-right">
+
+        <a href="/blogs/all/2022-03-21-finance-options/index.html"
+            onclick="gs_load_blog('/blogs/all/2022-03-21-finance-options/index.html',true);return false;"
+            class="inline-block my-2">
+            期权交易
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M11.25 4.5l7.5 7.5-7.5 7.5m-6-15l7.5 7.5-7.5 7.5" />
+            </svg>
+        </a>
+
+    </div>
+</div>
+
+
+<!-- oauth comment -->
+
+<hr class="gsc-border mt-4">
+<div class="mb-4"></div>
+<style>
+    div.comment-item {
+        display: flex;
+        max-width: 100%;
+        padding-bottom: 16px;
+    }
+
+    div.comment-item>div.comment-avatar {
+        flex-shrink: 0;
+        padding-right: 16px;
+    }
+
+    div.comment-item>div.comment-avatar>img {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+    }
+
+    div.comment-item>div.comment-content {
+        flex-grow: 1;
+        overflow: auto;
+    }
+</style>
+<script src="/static/markdown-it.min.js"></script>
+<script>
+    if (window.gitsite_comment === undefined) {
+        (function () {
+            const MAX_COMMENT_HEIGHT = 400;
+            // begin function
+            function _comment_set_token(token, user, expires) {
+                localStorage.setItem('_comment_token_', token);
+                localStorage.setItem('_comment_user_', JSON.stringify(user));
+                localStorage.setItem('_comment_expires_', expires.toString());
+            }
+
+            function _comment_get_user() {
+                const expires = parseInt(localStorage.getItem('_comment_expires_') || '0');
+                if (Date.now() > expires) {
+                    return null;
+                }
+                return JSON.parse(localStorage.getItem('_comment_user_'));
+            }
+
+            function _comment_get_token() {
+                const expires = parseInt(localStorage.getItem('_comment_expires_') || '0');
+                if (Date.now() > expires) {
+                    return null;
+                }
+                return localStorage.getItem('_comment_token_');
+            }
+
+            function _comment_markdown_render(text, autoCollapse = true) {
+                const md = markdownit();
+                const defaultRender = md.renderer.rules.link_open || function (tokens, idx, options, env, self) {
+                    return self.renderToken(tokens, idx, options);
+                };
+                md.renderer.rules.link_open = function (tokens, idx, options, env, self) {
+                    // Add a new `target` attribute, or replace the value of the existing one.
+                    tokens[idx].attrSet('target', '_blank');
+                    tokens[idx].attrSet('rel', 'nofollow');
+                    // Pass the token to the default renderer.
+                    return defaultRender(tokens, idx, options, env, self);
+                };
+                if (autoCollapse) {
+                    return '<div class="x-auto-collapse">' + md.render(text) + '</div>';
+                }
+                return md.render(text);
+            }
+
+            function _comment_remove(btn, msg) {
+                if (!confirm(msg)) {
+                    return;
+                }
+                const item = _comment_find_parent(btn, 'comment-item');
+                const type = item.getAttribute('type');
+                const id = item.getAttribute('id');
+                const token = _comment_get_token();
+                let path = null;
+                let data = {};
+                if (type === 'comment') {
+                    path = '/api/comments';
+                    data.commentId = id;
+                } else if (type === 'reply') {
+                    path = '/api/replies';
+                    data.replyId = id;
+                } else {
+                    throw 'invalid type';
+                }
+                btn.style.display = 'none';
+                fetch('https://api.liaoxuefeng.com' + path, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': 'Bearer: ' + token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                }).then(resp => {
+                    console.log('delete ok.');
+                    _comment_start_load(true);
+                }).catch(err => {
+                    console.error(err);
+                });
+            }
+
+            function _comment_post(btn) {
+                const form = _comment_find_parent(btn, 'comment-form');
+                const err = form.querySelector('span.comment-post-error');
+                const token = _comment_get_token();
+                if (!token) {
+                    err.innerHTML = 'Please sign in first.';
+                    return;
+                }
+                const textarea = form.querySelector('textarea');
+                const content = textarea.value.trim();
+                if (content === '') {
+                    err.innerHTML = 'content is empty.';
+                    return;
+                }
+                const type = form.getAttribute('type');
+                const id = form.getAttribute('id');
+                let data = {
+                    content: content
+                };
+                let path = null;
+                if (type === 'comment') {
+                    data.pageUrl = id;
+                    path = '/api/comments';
+                } else if (type === 'reply') {
+                    data.commentId = id;
+                    path = '/api/replies';
+                } else {
+                    err.innerHTML = 'invalid type.';
+                    return;
+                }
+                console.log(data);
+                err.innerHTML = '';
+                btn.disabled = true;
+
+                fetch('https://api.liaoxuefeng.com' + path, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer: ' + token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                }).then(resp => {
+                    resp.json().then(obj => {
+                        if (obj.error) {
+                            console.error(obj.error, obj.message);
+                            err.innerHTML = (obj.message || obj.error).toString();
+                        } else {
+                            console.log('post comment ok.');
+                            textarea.value = '';
+                            _comment_start_load(true);
+                        }
+                    });
+                }).catch(err => {
+                    console.error(err);
+                    err.innerHTML = err.toString();
+                }).finally(() => {
+                    btn.disabled = false;
+                });
+            }
+
+            function _comment_has_class(dom, className) {
+                for (let i = 0; i < dom.classList.length; i++) {
+                    if (dom.classList[i] === className) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            function _comment_find_parent(dom, className) {
+                while (!_comment_has_class(dom, className)) {
+                    dom = dom.parentElement;
+                }
+                return dom;
+            }
+
+            function _comment_start_reply(dom) {
+                const actions = _comment_find_parent(dom, 'comment-action');
+                const item = _comment_find_parent(dom, 'comment-item');
+                const form = item.querySelector('div.comment-form');
+                actions.style.display = 'none';
+                form.style.display = 'block';
+            }
+
+            function _comment_start_write(dom) {
+                const form = _comment_find_parent(dom, 'comment-form');
+                form.querySelector('div.comment-toolbar span.comment-write').style.display = 'inline';
+                form.querySelector('div.comment-toolbar a.comment-write').style.display = 'none';
+                form.querySelector('div.comment-toolbar span.comment-preview').style.display = 'none';
+                form.querySelector('div.comment-toolbar a.comment-preview').style.display = 'inline';
+                form.querySelectorAll('div.comment-toolbar a.comment-button').forEach(a => a.style.display = 'inline');
+                form.querySelector('div.comment-form-edit').style.display = 'block';
+                form.querySelector('div.comment-form-preview').style.display = 'none';
+            }
+
+            function _comment_start_preview(dom) {
+                const form = _comment_find_parent(dom, 'comment-form');
+                form.querySelector('div.comment-toolbar span.comment-write').style.display = 'none';
+                form.querySelector('div.comment-toolbar a.comment-write').style.display = 'inline';
+                form.querySelector('div.comment-toolbar span.comment-preview').style.display = 'inline';
+                form.querySelector('div.comment-toolbar a.comment-preview').style.display = 'none';
+                form.querySelectorAll('div.comment-toolbar a.comment-button').forEach(a => a.style.display = 'none');
+                form.querySelector('div.comment-form-edit').style.display = 'none';
+                const preview = form.querySelector('div.comment-form-preview');
+                const text = form.querySelector('textarea').value.trim() || '(empty)';
+                preview.innerHTML = _comment_markdown_render(text, false);
+                preview.style.display = 'block';
+            }
+
+            function _comment_edit(dom, command) {
+                const form = _comment_find_parent(dom, 'comment-form');
+                let insert = '';
+                switch (command) {
+                    case 'link':
+                        insert = '[link](https://example.com/)'
+                        break;
+                    case 'code':
+                        insert = '\n\n```\npaste code here...\n```\n\n';
+                        break;
+                    case 'ol':
+                        insert = '\n\n- item 1\n- item 2\n- item 3\n\n';
+                        break;
+                    case 'ul':
+                        insert = '\n\n1. item 1\n2. item 2\n3. item 3\n\n';
+                        break;
+                }
+                if (insert) {
+                    const textarea = form.querySelector('textarea');
+                    const position = textarea.selectionStart;
+                    const value = textarea.value;
+                    // Get the text before and after the cursor position
+                    const before = value.substring(0, position);
+                    const after = value.substring(position, value.length);
+
+                    // Insert the new text at the cursor position
+                    textarea.value = before + insert + after;
+
+                    // Set the cursor position to after the newly inserted text
+                    textarea.selectionStart = textarea.selectionEnd = position + insert.length;
+                    textarea.focus();
+                }
+            }
+
+            function _comment_render_template(str, obj) {
+                const keys = Object.keys(obj);
+                for (let key of keys) {
+                    let value = obj[key];
+                    str = str.replaceAll(new RegExp('\\$\\{' + key + '\\}', 'g'), value);
+                }
+                return str;
+            }
+
+            function _comment_loaded(commentThread, result, scroll) {
+                console.log('comments loaded ok.');
+                const itemTempl = document.getElementById('comment-item').innerHTML;
+                const formTempl = document.getElementById('comment-form').innerHTML;
+                const me = _comment_get_user();
+                console.log(result);
+                const action_delete_comment = '<a href="#0" onclick="gitsite_comment.remove(this, \'Confirm delete this comment?\')">Delete</a>';
+                const action_delete_reply = '<a href="#0" onclick="gitsite_comment.remove(this, \'Confirm delete this reply?\')">Delete</a>';
+                let comment_doms = result.comments.map(comment => {
+                    const action_reply = '<div class="comment-action pt-4 border-t gsc-border"><a href="#0" onclick="gitsite_comment.reply(this)">Reply</a></div>';
+                    const can_delete_comment = me !== null && (me.role === 1000 || me.id === comment.user_id);
+                    let model = {
+                        type: 'comment',
+                        id: comment.id,
+                        user_image: comment.user_image,
+                        user_name: gitsite.encodeHtml(comment.user_name),
+                        created_at: new Date(comment.created_at).toLocaleString(),
+                        content: _comment_markdown_render(comment.content),
+                        comment_reply_form: '',
+                        comment_action: me === null ? '' : action_reply,
+                        delete_action: can_delete_comment ? action_delete_comment : ''
+                    }
+                    let reply_doms = comment.replies.map(reply => {
+                        const can_delete_reply = me !== null && (me.role === 1000 || me.id === reply.user_id);
+                        let replyModel = {
+                            type: 'reply',
+                            id: reply.id,
+                            user_image: reply.user_image,
+                            user_name: gitsite.encodeHtml(reply.user_name),
+                            created_at: new Date(reply.created_at).toLocaleString(),
+                            content: _comment_markdown_render(reply.content),
+                            comment_reply_form: '',
+                            comment_replies: '',
+                            comment_action: '',
+                            delete_action: can_delete_reply ? action_delete_reply : ''
+                        };
+                        return _comment_render_template(itemTempl, replyModel);
+                    });
+                    model.comment_replies = reply_doms.join('');
+                    // set comment_reply_form:
+                    if (me !== null) {
+                        model.comment_reply_form = _comment_render_template(formTempl, {
+                            type: 'reply',
+                            id: comment.id,
+                            style: 'display:none',
+                            user_name: me.name,
+                            user_image: me.image
+                        });
+                    }
+                    return _comment_render_template(itemTempl, model);
+                });
+                let html = comment_doms.join('');
+                if (me !== null) {
+                    let comment_form = _comment_render_template(formTempl, {
+                        type: 'comment',
+                        id: location.href,
+                        style: '',
+                        user_name: me.name,
+                        user_image: me.image
+                    });
+                    html = html + comment_form;
+                }
+                commentThread.querySelector('div.comment-loading').style.display = 'none';
+                commentThread.querySelector('div.comment-topics').innerHTML = html;
+                commentThread.querySelectorAll('div.comment-topics div.x-auto-collapse').forEach(div => {
+                    if (div.scrollHeight <= MAX_COMMENT_HEIGHT + 60) {
+                        return;
+                    }
+                    div.style.maxHeight = MAX_COMMENT_HEIGHT + 'px';
+                    div.style.overflow = 'hidden';
+                    let p = document.createElement('p');
+                    p.innerHTML = '<a href="#0" class="x-read-more">Read More ▼</a><a href="#0" class="x-collapse" style="display:none">Collapse ▲</a>';
+                    div.parentNode.appendChild(p);
+                    const aReadMore = p.querySelector('a.x-read-more');
+                    const aCollapse = p.querySelector('a.x-collapse');
+                    aReadMore.onclick = () => {
+                        div.style.maxHeight = null;
+                        div.style.overflow = null;
+                        aReadMore.style.display = 'none';
+                        aCollapse.style.display = null;
+                    };
+                    aCollapse.onclick = () => {
+                        div.style.maxHeight = MAX_COMMENT_HEIGHT + 'px';
+                        div.style.overflow = 'hidden';
+                        aReadMore.style.display = null;
+                        aCollapse.style.display = 'none';
+                        div.parentNode.parentNode.scrollIntoView();
+                    };
+                });
+                if (scroll) {
+                    commentThread.scrollIntoView();
+                }
+            }
+
+            function _comment_start_load(scroll = false) {
+                const commentThread = document.getElementById('comment-thread');
+                if (!commentThread) {
+                    return;
+                }
+                console.log(`start loading comments: ${location.href}`);
+                const version = Date.now().toString();
+                commentThread.setAttribute('init', version);
+                commentThread.querySelector('div.comment-topics').innerHTML = '';
+                // show loading:
+                commentThread.querySelector('div.comment-loading').style.display = 'block';
+                // hide info:
+                commentThread.querySelector('div.comment-info-failed').style.display = 'none';
+                commentThread.querySelector('div.comment-info-loaded').style.display = 'none';
+                fetch('https://api.liaoxuefeng.com/api/comments?url=' + encodeURIComponent(location.href))
+                    .then(resp => {
+                        resp.json().then(result => {
+                            const commentThread2 = document.getElementById('comment-thread');
+                            if (!commentThread2) {
+                                return;
+                            }
+                            if (commentThread2.getAttribute('init') !== version) {
+                                // dom changed:
+                                console.warn('skip load expired comments.');
+                                return;
+                            }
+                            // show info:
+                            const user = _comment_get_user();
+                            if (user === null) {
+                                // show signin:
+                                commentThread2.querySelector('span.comment-signin-state').style.display = 'none';
+                                commentThread2.querySelector('span.comment-signout-state').style.display = 'inline';
+                            } else {
+                                // show signout:
+                                commentThread2.querySelector('span.comment-signin-state').style.display = 'inline';
+                                commentThread2.querySelector('span.comment-signout-state').style.display = 'none';
+                                commentThread2.querySelector('span.comment-user-name').innerHTML = gitsite.encodeHtml(user.name);
+                            }
+                            commentThread2.querySelector('div.comment-info-loaded').style.display = 'block';
+                            _comment_loaded(commentThread2, result, scroll);
+                        });
+                    }).catch(err => {
+                        commentThread.querySelector('div.comment-info-failed').style.display = 'block';
+                    }).finally(() => {
+                        // hide loading:
+                        commentThread.querySelector('div.comment-loading').style.display = 'none';
+                    });
+            }
+
+            function _comment_oauth_signout() {
+                _comment_set_token('', '', 0);
+                _comment_start_load();
+            }
+
+            function _comment_oauth_signin() {
+                const origin = new URL('https://api.liaoxuefeng.com').origin;
+                let
+                    pw = 700,
+                    ph = 420,
+                    ww = window.outerWidth,
+                    wh = window.outerHeight,
+                    wl = window.screenLeft,
+                    wt = window.screenTop,
+                    pl = parseInt(wl + (ww - pw) / 2),
+                    pt = parseInt(wt + (wh - ph) / 2);
+                if (window.__oauth_popup_callback__ === undefined) {
+                    window.__oauth_popup_callback__ = true;
+                    window.addEventListener('message', (event) => {
+                        console.log('message from: ' + event.origin + ': ', event.data);
+                        if (event.origin === origin) {
+                            let oauthResult = event.data;
+                            console.log(oauthResult);
+                            if (oauthResult.success) {
+                                _comment_set_token(oauthResult.token, oauthResult.user, oauthResult.expires);
+                            }
+                            if (window.__oauth_popup__) {
+                                window.__oauth_popup__.close();
+                                window.__oauth_popup__ = null;
+                            }
+                            _comment_start_load();
+                        }
+                    });
+                }
+
+                window.__oauth_popup__ = window.open('https://api.liaoxuefeng.com/oauth_request', '__oauth_popup__', `popup=true,left=${pl},top=${pt},width=${pw},height=${ph}`);
+                window.__oauth_popup__.focus();
+            }
+
+            const fnOnScroll = () => {
+                const commentThread = document.getElementById('comment-thread');
+                if (!commentThread || commentThread.getAttribute('init') !== null) {
+                    return;
+                }
+                let winHeight = window.innerHeight;
+                let winOffsetY = window.scrollY;
+                let domTop = commentThread.offsetTop;
+                if (winHeight + winOffsetY + 20 > domTop) {
+                    _comment_start_load();
+                }
+            };
+
+            documentReady(() => {
+                window.addEventListener('scroll', fnOnScroll);
+                gitsite.addContentChangedListener(fnOnScroll);
+                fnOnScroll();
+            });
+
+            window.gitsite_comment = {
+                load: _comment_start_load,
+                signin: _comment_oauth_signin,
+                signout: _comment_oauth_signout,
+                reply: _comment_start_reply,
+                write: _comment_start_write,
+                preview: _comment_start_preview,
+                edit: _comment_edit,
+                post: _comment_post,
+                remove: _comment_remove
+            };
+
+            // end function
+        })();
+    }
+</script>
+
+<template id="comment-item">
+    <div class="comment-item border-t gsc-border pt-4" type="${type}" id="${id}">
+        <div class="comment-avatar">
+            <img class="border gsc-border" src="${user_image}">
+        </div>
+        <div class="comment-content">
+            <div>
+                <span class="comment-content-info">${user_name} @ ${created_at} ${delete_action}</span>
+            </div>
+            <div class="comment-content-text">${content}</div>
+            ${comment_replies}
+            ${comment_action}
+            ${comment_reply_form}
+        </div>
+    </div>
+</template>
+
+<template id="comment-form">
+    <div class="comment-form border-t gsc-border pt-4" type="${type}" id="${id}" style="${style}">
+        <div class="comment-item">
+            <div class="comment-avatar comment-current-user">
+                <img class="border gsc-border" src="${user_image}">
+            </div>
+            <div class="comment-content">
+                <div class="comment-toolbar">
+                    <span class="comment-write me-4">Write</span>
+                    <a href="#0" onclick="gitsite_comment.write(this)" class="comment-write me-4"
+                        style="display:none">Write</a>
+                    <span class="comment-preview me-4" style="display:none">Preview</span>
+                    <a href="#0" onclick="gitsite_comment.preview(this)" class="comment-preview me-4">Preview</a>
+                    <a href="#0" onclick="gitsite_comment.edit(this,'link')" class="comment-button me-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                            class="bi bi-link-45deg" viewBox="0 0 16 16">
+                            <path
+                                d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1 1 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4 4 0 0 1-.128-1.287z" />
+                            <path
+                                d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243z" />
+                        </svg>
+                    </a>
+                    <a href="#0" onclick="gitsite_comment.edit(this,'code')" class="comment-button me-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                            class="bi bi-code-slash" viewBox="0 0 16 16">
+                            <path
+                                d="M10.478 1.647a.5.5 0 1 0-.956-.294l-4 13a.5.5 0 0 0 .956.294zM4.854 4.146a.5.5 0 0 1 0 .708L1.707 8l3.147 3.146a.5.5 0 0 1-.708.708l-3.5-3.5a.5.5 0 0 1 0-.708l3.5-3.5a.5.5 0 0 1 .708 0m6.292 0a.5.5 0 0 0 0 .708L14.293 8l-3.147 3.146a.5.5 0 0 0 .708.708l3.5-3.5a.5.5 0 0 0 0-.708l-3.5-3.5a.5.5 0 0 0-.708 0" />
+                        </svg>
+                    </a>
+                    <a href="#0" onclick="gitsite_comment.edit(this,'ol')" class="comment-button me-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                            class="bi bi-list-ol" viewBox="0 0 16 16">
+                            <path fill-rule="evenodd"
+                                d="M5 11.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5" />
+                            <path
+                                d="M1.713 11.865v-.474H2c.217 0 .363-.137.363-.317 0-.185-.158-.31-.361-.31-.223 0-.367.152-.373.31h-.59c.016-.467.373-.787.986-.787.588-.002.954.291.957.703a.595.595 0 0 1-.492.594v.033a.615.615 0 0 1 .569.631c.003.533-.502.8-1.051.8-.656 0-1-.37-1.008-.794h.582c.008.178.186.306.422.309.254 0 .424-.145.422-.35-.002-.195-.155-.348-.414-.348h-.3zm-.004-4.699h-.604v-.035c0-.408.295-.844.958-.844.583 0 .96.326.96.756 0 .389-.257.617-.476.848l-.537.572v.03h1.054V9H1.143v-.395l.957-.99c.138-.142.293-.304.293-.508 0-.18-.147-.32-.342-.32a.33.33 0 0 0-.342.338zM2.564 5h-.635V2.924h-.031l-.598.42v-.567l.629-.443h.635z" />
+                        </svg>
+                    </a>
+                    <a href="#0" onclick="gitsite_comment.edit(this,'ul')" class="comment-button me-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                            class="bi bi-list-ul" viewBox="0 0 16 16">
+                            <path fill-rule="evenodd"
+                                d="M5 11.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m-3 1a1 1 0 1 0 0-2 1 1 0 0 0 0 2m0 4a1 1 0 1 0 0-2 1 1 0 0 0 0 2m0 4a1 1 0 1 0 0-2 1 1 0 0 0 0 2" />
+                        </svg>
+                    </a>
+                </div>
+                <div class="comment-form-edit">
+                    <textarea style="width:100%" rows="10" name="comment"
+                        placeholder="Write your comment using Markdown format..."></textarea>
+                </div>
+                <div class="comment-form-preview my-2 border-t border-b gsc-border" style="display:none"></div>
+                <div>
+                    <button type="button" onclick="gitsite_comment.post(this)">Post</button>
+                    <span class="comment-post-error"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<div id="comment-thread">
+    <h3>Comments</h3>
+    <div class="comment-loading my-4">
+        <svg class="animate-spin mr-2 h-5 w-5" style="display:inline" xmlns="http://www.w3.org/2000/svg" fill="none"
+            viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+            </path>
+        </svg>
+        Loading comments...
+    </div>
+    <div class="comment-info-failed my-4" style="display:none">Fail to load comments. Try
+        <a href="#0" onclick="gitsite_comment.load()">reload</a>.
+    </div>
+    <div class="comment-info-loaded my-4" style="display:none">Comments loaded.
+        <span class="comment-signout-state" style="display:none">To post a comment, please
+            <a href="#0" onclick="gitsite_comment.signin()">Sign In</a></span>
+        <span class="comment-signin-state" style="display:none">Hello, <span
+                class="comment-user-name font-semibold"></span>.
+            <a href="#0" onclick="gitsite_comment.signout()">Sign Out</a></span>
+    </div>
+    <div class="comment-topics">
+    </div>
+</div>
+
+<!--// oauth comment -->
+
+<!--// blog content -->
